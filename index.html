@@ -2969,7 +2969,8 @@
 
   function docenteRowHTML(d){
     const especialidad = (d.especialidades || []).join(' / ') || '—';
-    const comunidad = d.comunidades ? d.comunidades.nombre : '—';
+    const nombresComunidades = (d.todas_comunidades || []).map(c => c.nombre);
+    const comunidad = nombresComunidades.length ? nombresComunidades.join(' · ') : '—';
     return `
       <div class="docente-row" data-id="${esc(d.id)}">
         <span class="d-nombre">${esc(d.nombre_publico)}</span>
@@ -3015,11 +3016,13 @@
         <p>${d.especialidades.map(esc).join(' · ')}</p>
       </div>` : '';
 
-    const comunidadesAsociadas = (d.comunidades_asociadas || []);
-    const comunidadesSection = comunidadesAsociadas.length ? `
+    const comunidadesSection = (d.todas_comunidades && d.todas_comunidades.length) ? `
       <div class="modal-section">
-        <h4>Comunidades asociadas</h4>
-        <p>${comunidadesAsociadas.map(c => esc(c.nombre)).join(' · ')}</p>
+        <h4>Comunidades</h4>
+        ${d.todas_comunidades.map(c => `
+          <div class="row"><span>${esc(c.nombre)}${c.horario ? ' — ' + esc(c.horario) : ''}</span>
+            <button class="contact-btn outline" style="font-size:12px;padding:5px 10px;" onclick="verAgrupacionDesdeDocente('${esc(c.id)}')">Ver agrupación</button>
+          </div>`).join('')}
       </div>` : '';
 
     const participacionSection = d.participacion ? `
@@ -3059,18 +3062,11 @@
         <p>Este docente todavía no dejó un contacto público.</p>
       </div>`;
 
-    const ubicacionSection = d.comunidades ? `
-      <div class="modal-section">
-        <h4>Dónde encontrarlo ahora</h4>
-        <p>${esc(d.comunidades.nombre)}${d.comunidades.horario ? ` — ${esc(d.comunidades.horario)}` : ''}</p>
-        <button class="contact-btn outline" onclick="verAgrupacionDesdeDocente('${esc(d.comunidad_principal_id)}')">Ver agrupación</button>
-      </div>` : '';
-
     return `
       <button class="modal-close" onclick="closeModal()">&times;</button>
       ${photo}
       <h3 class="display">${esc(d.nombre_publico)}</h3>
-      <p class="tipo">${esc(d.rol_principal) || ''}${d.comunidades ? ' · ' + esc(d.comunidades.nombre) : ''}</p>
+      <p class="tipo">${esc(d.rol_principal) || ''}</p>
       ${verifBadgeHTML(d.estado_verificacion)}
       ${d.biografia ? `<div class="modal-section"><h4>Resumen</h4><p>${esc(d.biografia)}</p></div>` : ''}
       ${trayectoria}
@@ -3078,7 +3074,6 @@
       ${comunidadesSection}
       ${participacionSection}
       ${profesionSection}
-      ${ubicacionSection}
       ${redesSection}
       ${contactoSection}
     `;
@@ -3101,14 +3096,16 @@
       if(error) throw new Error(error.message);
       docentesData = data || [];
 
-      // Comunidades asociadas (relación muchos-a-muchos)
-      const { data: rels } = await client.from('docentes_comunidades').select('docente_id, comunidades(nombre)');
-      (rels || []).forEach(r => {
-        const d = docentesData.find(x => x.id === r.docente_id);
-        if(d){
-          d.comunidades_asociadas = d.comunidades_asociadas || [];
-          if(r.comunidades) d.comunidades_asociadas.push(r.comunidades);
-        }
+      // Todas las comunidades del docente, sin distinguir "principal" de "asociada"
+      // -- se tratan todas por igual (misma prioridad visual en todos lados).
+      const { data: rels } = await client.from('docentes_comunidades').select('docente_id, comunidad_id, comunidades(id, nombre, horario)');
+      docentesData.forEach(d => {
+        const set = new Map();
+        if(d.comunidades && d.comunidad_principal_id) set.set(d.comunidad_principal_id, { id: d.comunidad_principal_id, nombre: d.comunidades.nombre, horario: d.comunidades.horario });
+        (rels || []).filter(r => r.docente_id === d.id).forEach(r => {
+          if(r.comunidades) set.set(r.comunidad_id, { id: r.comunidad_id, nombre: r.comunidades.nombre, horario: r.comunidades.horario });
+        });
+        d.todas_comunidades = [...set.values()];
       });
 
       if(!docentesData.length){
