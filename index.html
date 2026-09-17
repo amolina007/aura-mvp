@@ -382,6 +382,37 @@
   .rep-card .desc{font-size:13.5px;color:var(--ink-soft);margin-top:8px;line-height:1.5;}
   .rep-card .steps-list{margin-top:10px;font-size:13px;color:var(--ink-soft);}
   .rep-card .steps-list li{margin-bottom:3px;}
+  .rep-legend{display:flex;flex-wrap:wrap;gap:14px;margin:-6px 0 18px;color:#d9cabc;font-size:13px;}
+  .rep-legend span{display:inline-flex;align-items:center;gap:7px;}
+  .rep-legend i{width:10px;height:10px;border-radius:50%;display:inline-block;background:var(--amber);}
+  .rep-legend .figure{background:var(--coral);}
+  .rep-legend .sequence{background:#7fc7b8;}
+  .rep-map-shell{overflow-x:auto;overscroll-behavior-x:contain;padding:2px 0 18px;scrollbar-color:var(--coral) rgba(246,239,228,.12);}
+  .rep-map{position:relative;min-width:940px;display:grid;grid-template-columns:150px repeat(var(--difficulty-count,3),minmax(230px,1fr));gap:1px;background:rgba(246,239,228,.15);border:1px solid rgba(246,239,228,.18);}
+  .rep-map-header,.rep-style-label,.rep-lane{position:relative;background:#2b1915;}
+  .rep-map-corner,.rep-map-header{padding:13px 16px;color:#d9cabc;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
+  .rep-map-corner{position:sticky;left:0;z-index:5;background:#24130f;}
+  .rep-style-label{position:sticky;left:0;z-index:4;padding:18px 14px;border-left:4px solid var(--coral);color:var(--paper);}
+  .rep-style-label strong{display:block;font-family:'Anton',sans-serif;font-size:20px;font-weight:400;}
+  .rep-style-label small{display:block;margin-top:4px;color:#bfaea0;font-size:11px;}
+  .rep-lane{min-height:150px;padding:16px 14px;display:flex;flex-direction:column;gap:11px;}
+  .rep-node{position:relative;z-index:2;width:100%;text-align:left;background:var(--paper);color:var(--ink);border:0;border-left:4px solid var(--amber);padding:12px 13px;box-shadow:0 6px 14px rgba(0,0,0,.3);cursor:pointer;font-family:'Work Sans',sans-serif;}
+  .rep-node:hover,.rep-node:focus-visible{transform:translateY(-2px);box-shadow:0 9px 19px rgba(0,0,0,.38);outline:2px solid var(--amber);outline-offset:2px;}
+  .rep-node[data-kind="figura"]{border-left-color:var(--coral);}
+  .rep-node[data-kind="secuencia"]{border-left-color:#56ad9b;}
+  .rep-node strong{display:block;font-size:14px;line-height:1.25;}
+  .rep-node small{display:block;margin-top:5px;color:var(--ink-soft);font-size:11px;}
+  .rep-node .rep-base-count{display:inline-block;margin-top:7px;padding:2px 7px;background:rgba(36,21,16,.09);font-size:10.5px;font-weight:700;}
+  .rep-connectors{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:visible;}
+  .rep-connectors path{fill:none;stroke:rgba(238,167,75,.72);stroke-width:2;stroke-linecap:round;}
+  .rep-connectors path.sequence{stroke:rgba(86,173,155,.78);stroke-dasharray:5 4;}
+  .rep-empty-lane{margin:auto;color:#856f64;font-size:12px;text-align:center;}
+  @media(max-width:640px){
+    .rep-map{grid-template-columns:112px repeat(var(--difficulty-count,3),220px);}
+    .rep-style-label{padding:14px 9px;}
+    .rep-style-label strong{font-size:17px;}
+    .rep-lane{padding:12px 10px;min-height:136px;}
+  }
 
   /* ---- lista detallada de eventos ---- */
   .event-list{display:grid;gap:16px;}
@@ -786,8 +817,8 @@
     <p class="sub">Pasos, figuras y secuencias — el catálogo técnico detrás de las clases.</p>
 
     <div class="subtabs">
-      <button class="subtab active" data-rep="pasos">Pasos y figuras</button>
-      <button class="subtab" data-rep="secuencias">Secuencias</button>
+      <button class="subtab active" data-rep="mapa">Mapa conectado</button>
+      <button class="subtab" data-rep="secuencias">Solo secuencias</button>
     </div>
 
     <div class="filters">
@@ -799,6 +830,13 @@
         <label for="r-dificultad">Dificultad</label>
         <select id="r-dificultad"><option value="">Todas</option></select>
       </div>
+    </div>
+
+    <div class="rep-legend" aria-label="Leyenda del mapa">
+      <span><i></i>Paso base</span>
+      <span><i class="figure"></i>Figura</span>
+      <span><i class="sequence"></i>Secuencia</span>
+      <span>Las líneas indican qué movimientos sirven de base.</span>
     </div>
 
     <div id="rep-grid" class="grid rep-grid">
@@ -2709,7 +2747,9 @@
   // ---------------- Repertorio ----------------
   let repertorioLoaded = false;
   let pasosData = [], secuenciasData = [];
-  let repView = 'pasos';
+  let pasoPrerequisitos = [];
+  let repView = 'mapa';
+  let repResizeTimer = null;
 
   document.querySelectorAll('.subtab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2721,6 +2761,11 @@
   });
   document.getElementById('r-estilo').addEventListener('change', renderRepertorio);
   document.getElementById('r-dificultad').addEventListener('change', renderRepertorio);
+
+  window.addEventListener('resize', () => {
+    clearTimeout(repResizeTimer);
+    repResizeTimer = setTimeout(drawRepertorioConnections, 120);
+  });
 
   function pasoCardHTML(p){
     const tags = (p.etiquetas || []).map(t => `<span class="rep-tag">${esc(t)}</span>`).join('');
@@ -2803,7 +2848,9 @@
     const grid = document.getElementById('rep-grid');
     const estilo = document.getElementById('r-estilo').value;
     const dificultad = document.getElementById('r-dificultad').value;
-    const source = repView === 'pasos' ? pasosData : secuenciasData;
+    const source = repView === 'mapa'
+      ? [...pasosData.map(x => ({...x, _repKind:'paso'})), ...secuenciasData.map(x => ({...x, _repKind:'secuencia', tipo:'Secuencia'}))]
+      : secuenciasData.map(x => ({...x, _repKind:'secuencia', tipo:'Secuencia'}));
     const filtered = source.filter(x =>
       (!estilo || x.estilo === estilo) && (!dificultad || x.dificultad === dificultad)
     );
@@ -2811,28 +2858,87 @@
       grid.innerHTML = `<p class="state-msg">Nada que calce con ese filtro todavía.</p>`;
       return;
     }
-    grid.innerHTML = filtered.map(repView === 'pasos' ? pasoCardHTML : secuenciaCardHTML).join('');
-    grid.querySelectorAll('.rep-card').forEach(el => {
-      el.style.cursor = 'pointer';
-      el.addEventListener('click', () => {
-        const source = repView === 'pasos' ? pasosData : secuenciasData;
-        const item = source.find(x => x.id === el.dataset.id);
-        if(!item) return;
-        openSimpleModal(repView === 'pasos' ? pasoModalHTML(item) : secuenciaModalHTML(item));
+    const difficultyOrder = ['Básico','Intermedio','Avanzado'];
+    const difficulties = [...new Set(filtered.map(x => x.dificultad || 'Sin nivel'))]
+      .sort((a,b) => {
+        const ai = difficultyOrder.indexOf(a), bi = difficultyOrder.indexOf(b);
+        return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) || a.localeCompare(b, 'es');
+      });
+    const styles = [...new Set(filtered.map(x => x.estilo || 'Sin estilo'))].sort((a,b) => a.localeCompare(b, 'es'));
+    const nodeHTML = item => {
+      const bases = item._repKind === 'paso'
+        ? pasoPrerequisitos.filter(r => r.paso_id === item.id).length
+        : (item.pasos_ids || []).length;
+      const kind = item._repKind === 'secuencia' ? 'secuencia' : ((item.tipo || '').toLowerCase().includes('figura') ? 'figura' : 'paso');
+      return `<button class="rep-node" data-id="${esc(item.id)}" data-kind="${kind}" data-source="${item._repKind}">
+        <strong>${esc(item.nombre)}</strong>
+        <small>${esc(item.tipo || (repView === 'secuencias' ? 'Secuencia' : 'Paso'))}</small>
+        ${bases ? `<span class="rep-base-count">${bases} ${bases === 1 ? 'base' : 'bases'}</span>` : ''}
+      </button>`;
+    };
+    let html = `<div class="rep-map-shell"><div class="rep-map" style="--difficulty-count:${difficulties.length}">
+      <div class="rep-map-corner">Estilo ↓ · dificultad →</div>
+      ${difficulties.map(d => `<div class="rep-map-header">${esc(d)}</div>`).join('')}`;
+    styles.forEach(styleName => {
+      const rowItems = filtered.filter(x => (x.estilo || 'Sin estilo') === styleName);
+      html += `<div class="rep-style-label"><strong>${esc(styleName)}</strong><small>${rowItems.length} movimientos</small></div>`;
+      difficulties.forEach(level => {
+        const laneItems = rowItems.filter(x => (x.dificultad || 'Sin nivel') === level);
+        html += `<div class="rep-lane" data-style="${esc(styleName)}" data-level="${esc(level)}">${laneItems.length ? laneItems.map(nodeHTML).join('') : '<span class="rep-empty-lane">Aún sin movimientos</span>'}</div>`;
       });
     });
+    html += '<svg class="rep-connectors" aria-hidden="true"></svg></div></div>';
+    grid.classList.remove('grid','rep-grid');
+    grid.innerHTML = html;
+    grid.querySelectorAll('.rep-node').forEach(el => {
+      el.addEventListener('click', () => {
+        const isSequence = el.dataset.source === 'secuencia';
+        const item = (isSequence ? secuenciasData : pasosData).find(x => x.id === el.dataset.id);
+        if(!item) return;
+        openSimpleModal(isSequence ? secuenciaModalHTML(item) : pasoModalHTML(item));
+      });
+    });
+    requestAnimationFrame(drawRepertorioConnections);
+  }
+
+  function drawRepertorioConnections(){
+    const map = document.querySelector('#rep-grid .rep-map');
+    const svg = map && map.querySelector('.rep-connectors');
+    if(!map || !svg) return;
+    const mapRect = map.getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${map.scrollWidth} ${map.scrollHeight}`);
+    svg.setAttribute('width', map.scrollWidth);
+    svg.setAttribute('height', map.scrollHeight);
+    const relations = [
+      ...(repView === 'mapa' ? pasoPrerequisitos.map(r => ({ from:r.prerequisito_id, to:r.paso_id, kind:'paso' })) : []),
+      ...secuenciasData.flatMap(s => (s.pasos_ids || []).map(id => ({ from:id, to:s.id, kind:'sequence' })))
+    ];
+    const paths = [];
+    relations.forEach(rel => {
+      const from = map.querySelector(`.rep-node[data-id="${CSS.escape(String(rel.from))}"]`);
+      const to = map.querySelector(`.rep-node[data-id="${CSS.escape(String(rel.to))}"]`);
+      if(!from || !to) return;
+      const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+      const x1 = a.right - mapRect.left, y1 = a.top + a.height/2 - mapRect.top;
+      const x2 = b.left - mapRect.left, y2 = b.top + b.height/2 - mapRect.top;
+      const bend = Math.max(28, Math.abs(x2-x1)*.45);
+      paths.push(`<path class="${rel.kind}" d="M ${x1} ${y1} C ${x1+bend} ${y1}, ${x2-bend} ${y2}, ${x2} ${y2}"/>`);
+    });
+    svg.innerHTML = paths.join('');
   }
 
   async function loadRepertorio(){
     const grid = document.getElementById('rep-grid');
     try{
-      const [{ data: pasos, error: e1 }, { data: secs, error: e2 }] = await Promise.all([
+      const [{ data: pasos, error: e1 }, { data: secs, error: e2 }, prereqResult] = await Promise.all([
         client.from('pasos').select('*').order('nombre'),
         client.from('secuencias').select('*').order('nombre'),
+        client.from('paso_prerrequisitos').select('paso_id,prerequisito_id'),
       ]);
       if(e1 || e2) throw new Error((e1 && e1.message) || (e2 && e2.message));
       pasosData = pasos || [];
       secuenciasData = secs || [];
+      pasoPrerequisitos = prereqResult.error ? [] : (prereqResult.data || []);
 
       const estiloSel = document.getElementById('r-estilo');
       const dificSel = document.getElementById('r-dificultad');
