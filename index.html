@@ -358,6 +358,27 @@
   .rep-card .steps-list{margin-top:10px;font-size:13px;color:var(--ink-soft);}
   .rep-card .steps-list li{margin-bottom:3px;}
 
+  /* ---- lista detallada de eventos ---- */
+  .event-list{display:grid;gap:16px;}
+  .event-list-item{display:grid;grid-template-columns:92px 1fr;gap:20px;background:var(--paper);color:var(--ink);padding:20px;border-left:5px solid var(--coral);box-shadow:0 10px 18px rgba(0,0,0,.28);}
+  .event-date-box{background:var(--ink);color:var(--paper);text-align:center;padding:12px 8px;align-self:start;}
+  .event-date-box .day{display:block;font-family:'Anton',sans-serif;font-size:34px;line-height:1;}
+  .event-date-box .month{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
+  .event-date-box .time{display:block;margin-top:7px;color:var(--amber);font-size:12px;font-weight:700;}
+  .event-detail h4{font-family:'Anton',sans-serif;font-size:24px;margin:0 0 5px;}
+  .event-detail p{margin:4px 0;font-size:13.5px;}
+  .event-detail .event-description{color:var(--ink-soft);margin-top:9px;line-height:1.5;}
+  .event-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+  .event-actions button,.event-actions a{font:600 12.5px 'Work Sans',sans-serif;padding:7px 12px;border-radius:999px;cursor:pointer;text-decoration:none;}
+  .event-actions button{background:var(--ink);color:var(--paper);border:1px solid var(--ink);}
+  .event-actions .secondary,.event-actions a{background:transparent;color:var(--ink);border:1px solid rgba(36,21,16,.35);}
+  .event-social-count{color:var(--coral);font-weight:700;}
+  @media(max-width:640px){
+    .event-list-item{grid-template-columns:70px 1fr;gap:14px;padding:16px 14px;}
+    .event-date-box .day{font-size:28px;}
+    .event-actions{gap:6px;}
+  }
+
   /* ---- calendar ---- */
   .cal-layout{display:grid;grid-template-columns:1.3fr 1fr;gap:32px;align-items:start;}
   .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
@@ -784,7 +805,7 @@
     <h2 class="display">Eventos</h2>
     <p class="sub">Sociales, fiestas y eventos especiales que las agrupaciones organizan o patrocinan — muchas veces en salsotecas u otros espacios distintos al de las clases regulares.</p>
 
-    <div id="eventos-grid" class="grid rep-grid">
+    <div id="eventos-grid" class="event-list">
       <p class="state-msg">Cargando eventos…</p>
     </div>
 
@@ -1394,6 +1415,24 @@
       ]
     },
     {
+      q: '¿Qué horario te acomoda para empezar?',
+      opts: [
+        { t: 'De lunes a viernes en la tarde o noche', pts: { tranquilo: 1 }, pref: { schedule: 'semana' } },
+        { t: 'Los sábados', pts: { social: 1 }, pref: { schedule: 'sabado' } },
+        { t: 'Los domingos', pts: { aventura: 1 }, pref: { schedule: 'domingo' } },
+        { t: 'Me adapto a cualquier día', pts: {}, pref: { schedule: 'cualquiera' } },
+      ]
+    },
+    {
+      q: '¿En qué sector te gustaría bailar?',
+      opts: [
+        { t: 'Plaza de Maipú', pts: {}, pref: { location: 'plaza_maipu' } },
+        { t: 'Cualquier punto de Maipú', pts: {}, pref: { location: 'maipu' } },
+        { t: 'Otra comuna o sector cercano', pts: {}, pref: { location: 'otra' } },
+        { t: 'El lugar me da igual', pts: {}, pref: { location: 'cualquiera' } },
+      ]
+    },
+    {
       q: '¿Cómo prefieres empezar?',
       opts: [
         { t: 'Metiéndome de lleno a probar', pts: { aventura: 2 } },
@@ -1409,24 +1448,6 @@
         { t: 'No saber por dónde empezar', pts: { tranquilo: 1, bienestar: 1 } },
         { t: 'Creer que no tengo condición física', pts: { vital: 2 } },
         { t: 'Falta de tiempo o de rutina', pts: { aventura: 1, bienestar: 1 } },
-      ]
-    },
-    {
-      q: 'En una tarde libre, ¿qué prefieres?',
-      opts: [
-        { t: 'Estar con gente nueva', pts: { social: 2 } },
-        { t: 'Moverme, hacer algo activo', pts: { aventura: 1, vital: 1 } },
-        { t: 'Aprender algo', pts: { tranquilo: 2 } },
-        { t: 'Relajarme en buena compañía', pts: { bienestar: 2 } },
-      ]
-    },
-    {
-      q: '¿Cuál es tu edad aproximada?',
-      opts: [
-        { t: 'Menos de 30', pts: { social: 1 } },
-        { t: '30 a 50', pts: { aventura: 1 } },
-        { t: '50 a 65', pts: { bienestar: 1 } },
-        { t: 'Más de 65', pts: { vital: 2 } },
       ]
     },
   ];
@@ -1456,6 +1477,7 @@
 
   let welcomeAnswerIndex = 0;
   let welcomeScores = { social: 0, tranquilo: 0, bienestar: 0, aventura: 0, vital: 0 };
+  let welcomePreferences = { schedule: 'cualquiera', location: 'cualquiera' };
 
   document.getElementById('welcome-skip-btn').addEventListener('click', () => {
     localStorage.setItem('aura_welcome_seen', '1');
@@ -1465,6 +1487,7 @@
   document.getElementById('welcome-start-quiz').addEventListener('click', () => {
     welcomeAnswerIndex = 0;
     welcomeScores = { social: 0, tranquilo: 0, bienestar: 0, aventura: 0, vital: 0 };
+    welcomePreferences = { schedule: 'cualquiera', location: 'cualquiera' };
     document.getElementById('welcome-card').style.display = 'none';
     document.getElementById('welcome-quiz').style.display = '';
     welcomeRenderQuestion();
@@ -1481,7 +1504,8 @@
       btn.className = 'welcome-quiz-opt';
       btn.textContent = opt.t;
       btn.addEventListener('click', () => {
-        Object.keys(opt.pts).forEach(k => { welcomeScores[k] += opt.pts[k]; });
+        Object.keys(opt.pts || {}).forEach(k => { welcomeScores[k] += opt.pts[k]; });
+        if(opt.pref) Object.assign(welcomePreferences, opt.pref);
         welcomeAnswerIndex++;
         if(welcomeAnswerIndex < WELCOME_QUESTIONS.length){
           welcomeRenderQuestion();
@@ -1491,6 +1515,29 @@
       });
       optsBox.appendChild(btn);
     });
+  }
+
+  function welcomeMatchesSchedule(comunidad, schedule){
+    if(schedule === 'cualquiera') return true;
+    const horario = (comunidad.horario || '').toLowerCase();
+    if(schedule === 'sabado') return horario.includes('sábado') || horario.includes('sabado');
+    if(schedule === 'domingo') return horario.includes('domingo');
+    return ['lunes','martes','miércoles','miercoles','jueves','viernes'].some(d => horario.includes(d));
+  }
+
+  function welcomeMatchesLocation(comunidad, location){
+    if(location === 'cualquiera') return true;
+    const nombre = (comunidad.locacion_nombre || '').toLowerCase();
+    const comuna = (comunidad.locacion_comuna || '').toLowerCase();
+    if(location === 'plaza_maipu') return nombre.includes('plaza de maipú') || nombre.includes('plaza de maipu');
+    if(location === 'maipu') return comuna.includes('maipú') || comuna.includes('maipu');
+    return !(comuna.includes('maipú') || comuna.includes('maipu'));
+  }
+
+  function welcomePreferenceLabel(){
+    const horarios = { semana:'Lunes a viernes', sabado:'Sábados', domingo:'Domingos', cualquiera:'Cualquier día' };
+    const lugares = { plaza_maipu:'Plaza de Maipú', maipu:'Maipú', otra:'Otra comuna', cualquiera:'Cualquier sector' };
+    return `${horarios[welcomePreferences.schedule]} · ${lugares[welcomePreferences.location]}`;
   }
 
   function welcomeCommunityScore(comunidad, perfil){
@@ -1513,16 +1560,22 @@
         .select('id, nombre, horario, estilos, incluye_social, precio_clase, precio_combo, locacion_nombre, locacion_mapa_url, locacion_comuna')
         .order('nombre');
       if(error) throw new Error(error.message);
-      const recomendaciones = (data || [])
-        .filter(c => c.horario && c.locacion_nombre)
+      const candidatas = (data || []).filter(c =>
+        c.horario && c.locacion_nombre
+        && welcomeMatchesSchedule(c, welcomePreferences.schedule)
+        && welcomeMatchesLocation(c, welcomePreferences.location)
+      );
+      const recomendaciones = candidatas
         .sort((a,b) => welcomeCommunityScore(b, perfilClave) - welcomeCommunityScore(a, perfilClave)
           || a.nombre.localeCompare(b.nombre, 'es'))
         .slice(0, 3);
       if(!recomendaciones.length){
-        box.innerHTML = '<p class="state-msg" style="padding:12px 0;">Aún no hay horarios y lugares confirmados para recomendarte.</p>';
+        box.innerHTML = `
+          <p class="welcome-recommendations-title">Filtro: ${esc(welcomePreferenceLabel())}</p>
+          <p class="state-msg" style="padding:12px 0;">Todavía no tenemos una agrupación confirmada que coincida con ese horario y sector. Puedes revisar todas las opciones publicadas.</p>`;
         return;
       }
-      box.innerHTML = '<p class="welcome-recommendations-title">Opciones reales para empezar</p>' + recomendaciones.map(c => {
+      box.innerHTML = `<p class="welcome-recommendations-title">Filtro: ${esc(welcomePreferenceLabel())}</p>` + recomendaciones.map(c => {
         const estilos = Array.isArray(c.estilos) ? c.estilos.join(' · ') : (c.estilos || '');
         const mapaUrl = safeHref(c.locacion_mapa_url);
         return `
@@ -1540,8 +1593,7 @@
       box.querySelectorAll('[data-welcome-community]').forEach(btn => {
         btn.addEventListener('click', () => {
           document.querySelector('.tab[data-view="agrupaciones"]').click();
-          const id = btn.dataset.welcomeCommunity;
-          window.setTimeout(() => openModal(id), 80);
+          window.setTimeout(() => openModal(btn.dataset.welcomeCommunity), 80);
         });
       });
     } catch(err){
@@ -2302,15 +2354,36 @@
 
   function eventoCardHTML(ev){
     const fecha = ev.fecha_hora ? new Date(ev.fecha_hora) : null;
-    const fechaLabel = fecha
-      ? fecha.toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long'})
-      : 'Fecha por confirmar';
+    const dia = fecha ? fecha.toLocaleDateString('es-CL', {day:'2-digit'}) : '—';
+    const mes = fecha ? fecha.toLocaleDateString('es-CL', {month:'short'}).replace('.','') : 'Sin fecha';
+    const hora = fecha ? fecha.toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'}) : 'Por confirmar';
+    const loc = ev.locaciones;
+    const comunidad = ev.comunidades;
+    const likes = (ev.likes_evento || []).length;
+    const comentarios = (ev.comentarios_evento || []).length;
+    const mapaUrl = loc ? safeHref(loc.mapa_url) : null;
     return `
-      <div class="rep-card" data-id="${esc(ev.id)}">
-        <h4>${esc(ev.nombre)}</h4>
-        <p class="meta">${esc([fechaLabel.charAt(0).toUpperCase() + fechaLabel.slice(1), ev.tipo, ev.estilo].filter(Boolean).join(' · '))}</p>
-        ${ev.descripcion ? `<p class="desc">${esc(ev.descripcion)}</p>` : ''}
-      </div>`;
+      <article class="event-list-item" data-id="${esc(ev.id)}">
+        <div class="event-date-box">
+          <span class="day">${esc(dia)}</span>
+          <span class="month">${esc(mes)}</span>
+          <span class="time">${esc(hora)}</span>
+        </div>
+        <div class="event-detail">
+          <h4>${esc(ev.nombre)}</h4>
+          <p><strong>${esc([ev.tipo, ev.estilo].filter(Boolean).join(' · ')) || 'Evento'}</strong></p>
+          ${comunidad ? `<p>💃 Promueve: ${esc(comunidad.nombre)}</p>` : '<p>💃 Sin agrupación promotora confirmada</p>'}
+          ${loc ? `<p>📍 ${esc([loc.nombre, loc.comuna].filter(Boolean).join(' · '))}</p>` : '<p>📍 Lugar por confirmar</p>'}
+          ${ev.descripcion ? `<p class="event-description">${esc(ev.descripcion)}</p>` : ''}
+          <p class="event-social-count" data-event-metrics="${esc(ev.id)}">❤️ ${likes} · 💬 ${comentarios}</p>
+          <div class="event-actions">
+            <button type="button" data-event-detail="${esc(ev.id)}">Ver detalles, likes y comentarios</button>
+            ${comunidad ? `<button type="button" class="secondary" data-event-community="${esc(comunidad.id)}">Ver agrupación</button>` : ''}
+            ${mapaUrl ? `<a href="${mapaUrl}" target="_blank" rel="noopener">Abrir lugar</a>` : ''}
+            ${fecha ? `<button type="button" class="secondary" data-event-calendar="${esc(ev.id)}">Ver en calendario</button>` : ''}
+          </div>
+        </div>
+      </article>`;
   }
 
   function eventoModalHTML(ev){
@@ -2319,48 +2392,93 @@
       ? fecha.toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit'})
       : 'Por confirmar';
     const loc = ev.locaciones || locacionesData.find(l => l.id === ev.locacion_id);
+    const comunidad = ev.comunidades;
+    const mapaUrl = loc ? safeHref(loc.mapa_url) : null;
     const difusionUrl = safeHref(ev.url_difusion);
-    const yaOcurrio = fecha && fecha.getTime() <= Date.now();
     return `
       <button class="modal-close" onclick="closeModal()">&times;</button>
       <h3 class="display">${esc(ev.nombre)}</h3>
       <p class="tipo">${esc([ev.tipo, ev.estilo].filter(Boolean).join(' · ')) || 'Evento'}</p>
       <div class="row"><span>Fecha</span><span>${esc(fechaLabel.charAt(0).toUpperCase() + fechaLabel.slice(1))}</span></div>
-      ${loc ? `<div class="row"><span>Lugar</span><span>${esc(loc.nombre)}</span></div>` : ''}
+      ${loc ? `<div class="row"><span>Lugar</span><span>${esc([loc.nombre,loc.comuna].filter(Boolean).join(' · '))}</span></div>` : ''}
+      ${comunidad ? `<div class="row"><span>Agrupación</span><span>${esc(comunidad.nombre)}</span></div>` : ''}
+      <div class="event-actions" style="margin-top:18px;">
+        ${comunidad ? `<button type="button" data-modal-community="${esc(comunidad.id)}">Ver agrupación</button>` : ''}
+        ${mapaUrl ? `<a href="${mapaUrl}" target="_blank" rel="noopener">Abrir lugar</a>` : ''}
+        ${fecha ? '<button type="button" class="secondary" id="event-modal-calendar">Ver en calendario</button>' : ''}
+      </div>
       ${ev.descripcion ? `<div class="modal-section"><h4>Sobre el evento</h4><p>${esc(ev.descripcion)}</p></div>` : ''}
       ${difusionUrl ? `<div class="modal-section modal-contact"><h4>Más información</h4><p><a href="${difusionUrl}" target="_blank" rel="noopener">Ver difusión</a></p></div>` : ''}
-      ${yaOcurrio ? `<div class="modal-section" id="ev-comentarios-box"><p class="state-msg">Cargando comentarios…</p></div>` : ''}
+      <div class="modal-section" id="ev-comentarios-box"><p class="state-msg">Cargando likes y comentarios…</p></div>
     `;
+  }
+
+  async function irAEventoEnCalendario(ev){
+    if(!ev || !ev.fecha_hora) return;
+    const fecha = new Date(ev.fecha_hora);
+    calSelected = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+    calMonth = new Date(fecha.getFullYear(), fecha.getMonth(), 1);
+    closeModal();
+    document.querySelector('.tab[data-view="calendario"]').click();
+    if(!calendarioLoaded) await loadCalendario();
+    renderCalGrid();
+    const label = calSelected.toLocaleDateString('es-CL', {weekday:'long',day:'numeric',month:'long'});
+    renderAgenda(ymd(calSelected), label.charAt(0).toUpperCase() + label.slice(1));
+    window.setTimeout(() => document.getElementById('agenda-list').scrollIntoView({behavior:'smooth',block:'start'}), 80);
+  }
+
+  function abrirEvento(ev){
+    openSimpleModal(eventoModalHTML(ev));
+    const communityBtn = document.querySelector('[data-modal-community]');
+    if(communityBtn) communityBtn.addEventListener('click', () => {
+      closeModal();
+      document.querySelector('.tab[data-view="agrupaciones"]').click();
+      window.setTimeout(() => openModal(communityBtn.dataset.modalCommunity), 80);
+    });
+    const calendarBtn = document.getElementById('event-modal-calendar');
+    if(calendarBtn) calendarBtn.addEventListener('click', () => irAEventoEnCalendario(ev));
+    cargarComentariosEvento(ev.id);
   }
 
   async function cargarComentariosEvento(eventoId){
     const box = document.getElementById('ev-comentarios-box');
     if(!box) return;
-    const [{ data: comentarios }, { data: likes }, pasaporteRes] = await Promise.all([
+    const [{ data: comentarios, error: comentariosError }, { data: likes, error: likesError }, pasaporteRes] = await Promise.all([
       client.from('comentarios_evento').select('id, comentario, autor_alias, pasaporte_id, created_at').eq('evento_id', eventoId).order('created_at', { ascending: false }),
       client.from('likes_evento').select('pasaporte_id').eq('evento_id', eventoId),
       currentSession ? client.from('pasaportes').select('id').eq('auth_user_id', currentSession.user.id).maybeSingle() : Promise.resolve({ data: null }),
     ]);
+    if(comentariosError || likesError){
+      box.innerHTML = '<p class="state-msg">No pudimos cargar la conversación de este evento.</p>';
+      return;
+    }
     const miPasaporteId = pasaporteRes.data ? pasaporteRes.data.id : null;
     const yaDiLike = miPasaporteId && (likes || []).some(l => l.pasaporte_id === miPasaporteId);
+    const ev = eventosDataFull.find(e => e.id === eventoId);
+    if(ev){
+      ev.likes_evento = likes || [];
+      ev.comentarios_evento = comentarios || [];
+    }
+    const metric = document.querySelector(`[data-event-metrics="${eventoId}"]`);
+    if(metric) metric.textContent = `❤️ ${(likes || []).length} · 💬 ${(comentarios || []).length}`;
 
     box.innerHTML = `
       <h4>❤️ ${(likes || []).length} · 💬 ${(comentarios || []).length}</h4>
-      ${currentSession ? `<button class="contact-btn${yaDiLike ? '' : ' outline'}" id="ev-like-btn">${yaDiLike ? '❤️ Ya diste like' : '🤍 Dar like'}</button>` : '<p class="sub" style="font-size:12.5px;">Inicia sesión con Pasaporte para comentar o dar like.</p>'}
+      ${currentSession ? `<button class="contact-btn${yaDiLike ? '' : ' outline'}" id="ev-like-btn">${yaDiLike ? '❤️ Quitar like' : '🤍 Dar like'}</button>` : '<p class="sub" style="font-size:12.5px;">Inicia sesión y crea tu Pasaporte para comentar o dar like.</p>'}
       <div id="ev-comentarios-list" style="margin:14px 0;">
-        ${(comentarios && comentarios.length) ? comentarios.map(c => `
+        ${(comentarios && comentarios.length) ? comentarios.map(comentario => `
           <div class="row" style="align-items:flex-start;flex-direction:column;gap:2px;">
             <div style="display:flex;justify-content:space-between;width:100%;">
-              <span style="font-weight:600;">${esc(c.autor_alias)}</span>
-              ${(miPasaporteId === c.pasaporte_id) ? `<button class="contact-btn outline" data-borrar-comentario="${esc(c.id)}" style="padding:2px 8px;font-size:11px;">Borrar</button>` : ''}
+              <span style="font-weight:600;">${esc(comentario.autor_alias)}</span>
+              ${(miPasaporteId === comentario.pasaporte_id) ? `<button class="contact-btn outline" data-borrar-comentario="${esc(comentario.id)}" style="padding:2px 8px;font-size:11px;">Borrar</button>` : ''}
             </div>
-            <span style="font-size:13.5px;">${esc(c.comentario)}</span>
-          </div>`).join('') : '<p class="state-msg">Sé el primero en comentar.</p>'}
+            <span style="font-size:13.5px;">${esc(comentario.comentario)}</span>
+          </div>`).join('') : '<p class="state-msg">Sé el primero en comentar o coordinar.</p>'}
       </div>
       ${currentSession ? `
       <form id="ev-comentar-form">
         <div class="form-field">
-          <textarea id="ev-comentar-texto" maxlength="280" placeholder="¿Qué te pareció este evento? (máx. 280 caracteres)" required></textarea>
+          <textarea id="ev-comentar-texto" maxlength="280" placeholder="Pregunta, coordina o comparte algo sobre este evento…" required></textarea>
         </div>
         <button type="submit" class="form-submit">Comentar</button>
         <p class="form-msg" id="ev-comentar-msg"></p>
@@ -2378,45 +2496,50 @@
     if(form) form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const msg = document.getElementById('ev-comentar-msg');
-      const { error } = await client.rpc('fn_comentar_evento', {
-        p_evento_id: eventoId,
-        p_comentario: document.getElementById('ev-comentar-texto').value.trim(),
-      });
-      if(error === null){ cargarComentariosEvento(eventoId); }
+      const texto = document.getElementById('ev-comentar-texto').value.trim();
+      const { error } = await client.rpc('fn_comentar_evento', { p_evento_id: eventoId, p_comentario: texto });
+      if(error === null) cargarComentariosEvento(eventoId);
       else { msg.textContent = error.message; msg.className = 'form-msg err'; }
     });
-    box.querySelectorAll('button[data-borrar-comentario]').forEach(b => {
-      b.addEventListener('click', async () => {
-        const { error } = await client.rpc('fn_eliminar_comentario_evento', { p_comentario_id: b.dataset.borrarComentario });
+    box.querySelectorAll('button[data-borrar-comentario]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const { error } = await client.rpc('fn_eliminar_comentario_evento', { p_comentario_id: btn.dataset.borrarComentario });
         if(error === null) cargarComentariosEvento(eventoId);
         else alert('No se pudo borrar: ' + error.message);
       });
     });
   }
 
+  function enlazarAccionesEventos(grid){
+    grid.querySelectorAll('[data-event-detail]').forEach(btn => btn.addEventListener('click', () => {
+      const ev = eventosDataFull.find(x => x.id === btn.dataset.eventDetail);
+      if(ev) abrirEvento(ev);
+    }));
+    grid.querySelectorAll('[data-event-community]').forEach(btn => btn.addEventListener('click', () => {
+      document.querySelector('.tab[data-view="agrupaciones"]').click();
+      window.setTimeout(() => openModal(btn.dataset.eventCommunity), 80);
+    }));
+    grid.querySelectorAll('[data-event-calendar]').forEach(btn => btn.addEventListener('click', () => {
+      const ev = eventosDataFull.find(x => x.id === btn.dataset.eventCalendar);
+      if(ev) irAEventoEnCalendario(ev);
+    }));
+  }
+
   async function loadEventos(){
     const grid = document.getElementById('eventos-grid');
     try{
-      const { data, error } = await client.from('eventos').select('*, locaciones(nombre, mapa_url, comuna)').order('fecha_hora');
+      const { data, error } = await client.from('eventos')
+        .select('*, locaciones(nombre, mapa_url, comuna), comunidades(id, nombre), likes_evento(pasaporte_id), comentarios_evento(id)')
+        .order('fecha_hora');
       if(error) throw new Error(error.message);
       eventosDataFull = data || [];
       if(!eventosDataFull.length){
-        grid.innerHTML = `<p class="state-msg">Todavía no hay eventos publicados.</p>`;
+        grid.innerHTML = '<p class="state-msg">Todavía no hay eventos publicados.</p>';
         eventosLoaded = true;
         return;
       }
       grid.innerHTML = eventosDataFull.map(eventoCardHTML).join('');
-      grid.querySelectorAll('.rep-card').forEach(el => {
-        el.style.cursor = 'pointer';
-        el.addEventListener('click', () => {
-          const ev = eventosDataFull.find(x => x.id === el.dataset.id);
-          if(ev) {
-            openSimpleModal(eventoModalHTML(ev));
-            const fecha = ev.fecha_hora ? new Date(ev.fecha_hora) : null;
-            if(fecha && fecha.getTime() <= Date.now()) cargarComentariosEvento(ev.id);
-          }
-        });
-      });
+      enlazarAccionesEventos(grid);
       eventosLoaded = true;
     } catch(e){
       grid.innerHTML = `<p class="state-msg">No pudimos cargar los eventos: ${esc(e.message)}</p>`;
@@ -2863,14 +2986,11 @@
   // Calendario (recurringTemplates/itemsForDate) para no dar resultados
   // contradictorios entre ambas secciones.
   //
-  // Limitación real del esquema (no se oculta, se documenta aquí): la tabla
-  // `eventos` no tiene columna que la vincule a una `comunidad_id` -- no
-  // existe esa relación en la base real. Por eso el tipo "Evento" no puede
-  // filtrar agrupaciones por actividad ese día; se muestra la lista completa
-  // cuando "Evento" está entre los tipos marcados. Lo mismo aplica a "Otro",
-  // que no tiene ninguna tabla de actividad asociada en el esquema.
+  // Los eventos ahora están vinculados a su agrupación promotora mediante
+  // eventos.comunidad_id. "Otro" sigue mostrando todas las comunidades porque
+  // no tiene una fuente estructurada de actividad asociada.
   function comunidadesConActividadEn(dateStr, tipos){
-    if(tipos.includes('Evento') || tipos.includes('Otro')){
+    if(tipos.includes('Otro')){
       return new Set(registroComunidades.map(c => c.id));
     }
     const diaSemana = weekdayName(new Date(dateStr + 'T00:00:00'));
