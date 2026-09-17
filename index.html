@@ -1705,14 +1705,18 @@
     if(!box) return;
     try{
       const [principales, vinculados] = await Promise.all([
-        client.from('docentes').select('id, nombre_publico, rol_principal').eq('comunidad_principal_id', comunidadId).eq('visible_publicamente', true),
-        client.from('docentes_comunidades').select('docentes(id, nombre_publico, rol_principal, visible_publicamente)').eq('comunidad_id', comunidadId),
+        client.from('docentes_publicos').select('id, nombre_publico, rol_principal').eq('comunidad_principal_id', comunidadId),
+        client.from('docentes_comunidades_publicas').select('docente_id').eq('comunidad_id', comunidadId),
       ]);
       const lista = [...(principales.data || [])];
-      (vinculados.data || []).forEach(v => {
-        const d = v.docentes;
-        if(d && d.visible_publicamente && !lista.some(x => x.id === d.id)) lista.push(d);
-      });
+      const vinculadosIds = (vinculados.data || []).map(v => v.docente_id);
+      if(vinculadosIds.length){
+        const { data: docentesVinculados } = await client.from('docentes_publicos')
+          .select('id, nombre_publico, rol_principal').in('id', vinculadosIds);
+        (docentesVinculados || []).forEach(d => {
+          if(!lista.some(x => x.id === d.id)) lista.push(d);
+        });
+      }
       if(!box) return; // el modal pudo cerrarse mientras cargaba
       if(!lista.length){
         box.innerHTML = `<h4>Docentes</h4><p class="state-msg">Todavía no hay docentes vinculados a esta agrupación.</p>`;
@@ -1729,8 +1733,14 @@
   async function abrirDocentePorId(docenteId){
     let d = docentesData.find(x => x.id === docenteId);
     if(!d){
-      const { data } = await client.from('docentes').select('*, comunidades:comunidad_principal_id(nombre, horario)').eq('id', docenteId).maybeSingle();
-      d = data;
+      const { data } = await client.from('docentes_publicos').select('*').eq('id', docenteId).maybeSingle();
+      d = data ? {
+        ...data,
+        comunidades: data.comunidad_principal_id ? {
+          nombre: data.comunidad_principal_nombre,
+          horario: data.comunidad_principal_horario,
+        } : null,
+      } : null;
     }
     if(d) openSimpleModal(docenteModalHTML(d));
   }
@@ -1804,12 +1814,21 @@
     const grid = document.getElementById('grid');
     if(!client){ return; }
     try{
-      const { data, error } = await client
-        .from('comunidades')
-        .select('id, nombre, tipo, descripcion, vision, mision, publico_objetivo, logo_url, horario, precio_clase, precio_combo, incluye_social, estilos, estado_convergencia, es_afiliado_auraritmos, contacto_email, contacto_telefono, contacto_oficial_url, instagram_url, whatsapp_link, locaciones(nombre, mapa_url, comuna, referencia_url, lat, lng)')
-        .neq('estado_convergencia', 'rechazado')
-        .eq('visible_publicamente', true)
+      const { data: comunidadesPublicas, error } = await client
+        .from('comunidades_publicas')
+        .select('*')
         .order('nombre');
+      const data = (comunidadesPublicas || []).map(c => ({
+        ...c,
+        locaciones: c.locacion_id ? {
+          nombre: c.locacion_nombre,
+          mapa_url: c.locacion_mapa_url,
+          comuna: c.locacion_comuna,
+          referencia_url: c.locacion_referencia_url,
+          lat: c.locacion_lat,
+          lng: c.locacion_lng,
+        } : null,
+      }));
 
       if(error){
         console.error('Supabase error:', error.message, error.details, error.hint, error.code);
@@ -1996,7 +2015,7 @@
   async function loadBienestarStats(){
     try{
       const [{ count: nComunidades }, { count: nLocaciones }, { count: nPasos }] = await Promise.all([
-        client.from('comunidades').select('*', { count: 'exact', head: true }).eq('visible_publicamente', true),
+        client.from('comunidades_publicas').select('*', { count: 'exact', head: true }),
         client.from('locaciones').select('*', { count: 'exact', head: true }).eq('nodo_baile', true),
         client.from('pasos').select('*', { count: 'exact', head: true }),
       ]);
@@ -2089,7 +2108,7 @@
       const [{ data, error }, scheduleOk, comunidadesRes] = await Promise.all([
         client.from('locaciones').select('*').eq('nodo_baile', true).order('nombre'),
         loadMapSchedule(),
-        client.from('comunidades').select('id, nombre, locacion_id'),
+        client.from('comunidades_publicas').select('id, nombre, locacion_id'),
       ]);
       if(error) throw new Error(error.message);
       comunidadesPorLocacion = comunidadesRes.data || [];
@@ -2758,10 +2777,13 @@
       </label>`).join('');
 
     try{
-      const { data: comunidades, error: e1 } = await client.from('comunidades')
-        .select('id, nombre, locacion_id, incluye_social, locaciones(nombre)').order('nombre');
+      const { data: comunidades, error: e1 } = await client.from('comunidades_publicas')
+        .select('id, nombre, locacion_id, incluye_social, locacion_nombre').order('nombre');
       if(e1) throw new Error(e1.message);
-      registroComunidades = comunidades || [];
+      registroComunidades = (comunidades || []).map(c => ({
+        ...c,
+        locaciones: c.locacion_id ? { nombre: c.locacion_nombre } : null,
+      }));
       if(!calendarioLoaded) await loadCalendario();
       registroLoaded = true;
       actualizarComunidadesPorFecha();
@@ -3095,19 +3117,30 @@
     const list = document.getElementById('docentes-list');
     try{
       const { data, error } = await client
-        .from('docentes')
-        .select('*, comunidades:comunidad_principal_id(nombre, horario)')
+        .from('docentes_publicos')
+        .select('*')
         .order('nombre_publico');
       if(error) throw new Error(error.message);
-      docentesData = data || [];
+      docentesData = (data || []).map(d => ({
+        ...d,
+        comunidades: d.comunidad_principal_id ? {
+          nombre: d.comunidad_principal_nombre,
+          horario: d.comunidad_principal_horario,
+        } : null,
+      }));
 
       // Comunidades asociadas (relación muchos-a-muchos)
-      const { data: rels } = await client.from('docentes_comunidades').select('docente_id, comunidades(nombre)');
+      const [{ data: rels }, { data: comunidadesPublicas }] = await Promise.all([
+        client.from('docentes_comunidades_publicas').select('docente_id, comunidad_id'),
+        client.from('comunidades_publicas').select('id, nombre'),
+      ]);
+      const comunidadesPorId = new Map((comunidadesPublicas || []).map(c => [c.id, c]));
       (rels || []).forEach(r => {
         const d = docentesData.find(x => x.id === r.docente_id);
-        if(d){
+        const comunidad = comunidadesPorId.get(r.comunidad_id);
+        if(d && comunidad){
           d.comunidades_asociadas = d.comunidades_asociadas || [];
-          if(r.comunidades) d.comunidades_asociadas.push(r.comunidades);
+          d.comunidades_asociadas.push(comunidad);
         }
       });
 
@@ -3138,7 +3171,7 @@
       box.innerHTML = `<p class="desc">¿Eres profesor de alguna de estas agrupaciones? Inicia sesión para vincular tu cuenta a tu ficha de docente.</p>`;
       return;
     }
-    const { data: miDocente } = await client.from('docentes').select('id, nombre_publico').eq('auth_user_id', currentSession.user.id).maybeSingle();
+    const { data: miDocente } = await client.rpc('fn_mi_docente');
     if(miDocente){
       box.innerHTML = `<h4>Ya estás vinculado</h4><p class="desc">Tu cuenta está vinculada a la ficha de <b>${esc(miDocente.nombre_publico)}</b>. Puedes usar la pestaña "Gestor de Clases".</p>`;
       return;
@@ -3155,7 +3188,7 @@
         <div class="form-field">
           <label for="rd-docente">Tu ficha de docente</label>
           <select id="rd-docente" required><option value="">Elige tu nombre</option>
-            ${docentesData.filter(d => !d.auth_user_id).map(d => `<option value="${esc(d.id)}">${esc(d.nombre_publico)}</option>`).join('')}
+            ${docentesData.map(d => `<option value="${esc(d.id)}">${esc(d.nombre_publico)}</option>`).join('')}
           </select>
         </div>
         <div class="form-field">
@@ -3187,7 +3220,7 @@
   async function actualizarTabGestorClases(){
     const tab = document.getElementById('tab-gestor-clases');
     if(!currentSession){ tab.style.display = 'none'; return; }
-    const { data: miDocente } = await client.from('docentes').select('id, nombre_publico').eq('auth_user_id', currentSession.user.id).maybeSingle();
+    const { data: miDocente } = await client.rpc('fn_mi_docente');
     tab.style.display = miDocente ? '' : 'none';
   }
 
@@ -3204,7 +3237,7 @@
   async function loadGestorClases(){
     const box = document.getElementById('gc-contenido');
     if(!currentSession){ box.innerHTML = `<p class="state-msg">Inicia sesión.</p>`; return; }
-    const { data: miDocente } = await client.from('docentes').select('id, nombre_publico, comunidad_principal_id').eq('auth_user_id', currentSession.user.id).maybeSingle();
+    const { data: miDocente } = await client.rpc('fn_mi_docente');
     if(!miDocente){ box.innerHTML = `<p class="state-msg">Esta pestaña es solo para docentes con cuenta vinculada.</p>`; return; }
 
     const { data: rels } = await client.from('docentes_comunidades').select('comunidad_id').eq('docente_id', miDocente.id);
@@ -3791,7 +3824,7 @@
     }
 
     const [{ data: comunidades }, misAportesRes] = await Promise.all([
-      client.from('comunidades').select('id, nombre').order('nombre'),
+      client.from('comunidades_publicas').select('id, nombre').order('nombre'),
       pasaporte ? client.from('aportes_ecosistema').select('*').eq('pasaporte_id', pasaporte.id).order('created_at', { ascending: false }) : Promise.resolve({ data: null }),
     ]);
     const misAportes = misAportesRes.data;
@@ -4239,7 +4272,7 @@
         <p class="form-msg" id="hf-msg"></p>
       </form>`;
 
-    client.from('comunidades').select('id, nombre').order('nombre').then(({ data: comunidades }) => {
+    client.from('comunidades_publicas').select('id, nombre').order('nombre').then(({ data: comunidades }) => {
       const box = document.getElementById('hf-comunidad-check');
       if(!box) return;
       if(!comunidades || !comunidades.length){
