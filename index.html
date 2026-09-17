@@ -514,6 +514,51 @@
     color:#241510;padding:4px 13px;
   }
 
+  /* ---- RPG del baile ---- */
+  .modal.rpg-modal{max-width:980px;}
+  .rpg-hero{
+    background:linear-gradient(135deg,#241510 0%,#5c2d24 58%,#e8462f 100%);
+    color:var(--paper);padding:24px;margin:-32px -28px 22px;
+  }
+  .rpg-hero h3{margin:0 0 6px;font-size:36px;}
+  .rpg-hero p{margin:0;color:#f1ded2;max-width:720px;}
+  .rpg-styles{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;margin-bottom:8px;}
+  .rpg-style-pill{
+    flex:0 0 auto;border:2px solid var(--ink);background:transparent;color:var(--ink);
+    padding:8px 13px;font-weight:700;cursor:pointer;
+  }
+  .rpg-style-pill.active{background:var(--ink);color:var(--paper);}
+  .rpg-style-pill.inactive:not(.active){border-style:dashed;opacity:.62;}
+  .rpg-summary{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;margin:12px 0 20px;}
+  .rpg-progress{height:12px;background:rgba(36,21,16,.12);overflow:hidden;}
+  .rpg-progress span{display:block;height:100%;background:linear-gradient(90deg,var(--coral),var(--amber));}
+  .rpg-tree{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start;}
+  .rpg-level{
+    border:2px solid var(--ink);background:#fff;padding:15px;min-height:180px;position:relative;
+  }
+  .rpg-level + .rpg-level:before{
+    content:'→';position:absolute;left:-19px;top:24px;font-weight:900;color:var(--coral);
+  }
+  .rpg-level.locked{opacity:.55;background:#eee7dc;}
+  .rpg-level-head{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid rgba(36,21,16,.18);padding-bottom:9px;margin-bottom:10px;}
+  .rpg-level-head h4{margin:0;font-size:15px;}
+  .rpg-step{border:1px solid rgba(36,21,16,.2);padding:11px;margin-top:9px;background:var(--paper);}
+  .rpg-step.practicando{border-color:var(--amber);box-shadow:inset 4px 0 0 var(--amber);}
+  .rpg-step.dominado{border-color:var(--green);box-shadow:inset 4px 0 0 var(--green);}
+  .rpg-step.bloqueado{filter:grayscale(1);opacity:.62;}
+  .rpg-step-title{font-weight:700;font-size:14px;}
+  .rpg-step-state{font-size:12px;color:var(--ink-soft);margin-top:3px;}
+  .rpg-step button{margin-top:8px;font-size:12px;padding:6px 9px;}
+  .rpg-note{font-size:13px;color:var(--ink-soft);margin:12px 0;}
+  @media(max-width:760px){
+    .modal.rpg-modal{padding:24px 18px;}
+    .rpg-hero{margin:-24px -18px 18px;padding:22px 18px;}
+    .rpg-hero h3{font-size:30px;}
+    .rpg-summary{grid-template-columns:1fr;}
+    .rpg-tree{grid-template-columns:1fr;}
+    .rpg-level + .rpg-level:before{content:'↓';left:50%;top:-20px;}
+  }
+
   .form-card{
     background:var(--paper);color:var(--ink);
     padding:28px 26px;box-shadow:0 10px 18px rgba(0,0,0,0.3);
@@ -898,6 +943,12 @@
         <p class="desc" id="pp-auth-email"></p>
         <button class="contact-btn outline" id="pp-logout-btn" style="margin-top:8px;">Cerrar sesión</button>
       </div>
+    </div>
+
+    <div class="rep-card" id="pp-rpg-entry" style="margin-bottom:28px;">
+      <h4>🎮 RPG del baile</h4>
+      <p class="desc">Activa los estilos que practicas, domina pasos y desbloquea niveles de dificultad. Tu progreso es privado y no otorga XP automáticamente.</p>
+      <button type="button" class="form-submit" onclick="abrirRpgBaile()" style="width:auto;margin-top:10px;">Abrir árbol de habilidades</button>
     </div>
 
     <!-- Mi pasaporte (solo con sesión) -->
@@ -1937,6 +1988,7 @@
   }
 
   function openModal(id){
+    document.getElementById('modal-content').classList.remove('rpg-modal');
     const c = comunidadesData.find(x => x.id === id);
     if(!c) return;
     document.getElementById('modal-content').innerHTML = modalHTML(c);
@@ -1946,6 +1998,7 @@
 
   function closeModal(){
     document.getElementById('modal-back').classList.remove('open');
+    document.getElementById('modal-content').classList.remove('rpg-modal');
   }
 
   document.getElementById('modal-back').addEventListener('click', (e) => {
@@ -2684,6 +2737,7 @@
   }
 
   function openSimpleModal(html){
+    document.getElementById('modal-content').classList.remove('rpg-modal');
     document.getElementById('modal-content').innerHTML = html;
     document.getElementById('modal-back').classList.add('open');
   }
@@ -3710,6 +3764,12 @@
   // ---------------- Pasaportes: sesión (Magic Link) + ranking público ----------------
   let currentSession = null;
   let pasaportesLoaded = false;
+  let rpgPasaporteId = null;
+  let rpgCatalogo = [];
+  let rpgEstilosActivos = [];
+  let rpgProgreso = new Map();
+  let rpgEstiloActual = null;
+  const RPG_NIVELES = ['Básico','Intermedio','Avanzado'];
 
   function ligaDeElo(elo){
     const ligas = ['Hierro','Bronce','Plata','Oro','Platino','Esmeralda','Diamante','Maestro'];
@@ -3759,6 +3819,180 @@
   document.getElementById('pp-logout-btn').addEventListener('click', async () => {
     await client.auth.signOut();
   });
+
+  function rpgNivelDisponible(estilo, nivel){
+    if(!rpgEstilosActivos.includes(estilo)) return false;
+    const idx = RPG_NIVELES.indexOf(nivel);
+    if(idx <= 0) return true;
+    const anterior = RPG_NIVELES[idx - 1];
+    const pasosAnteriores = rpgCatalogo.filter(function(p){ return p.estilo === estilo && p.dificultad === anterior; });
+    if(!pasosAnteriores.length) return true;
+    const necesarios = Math.min(3, pasosAnteriores.length);
+    const dominados = pasosAnteriores.filter(function(p){
+      const progreso = rpgProgreso.get(p.id);
+      return progreso && progreso.estado === 'dominado';
+    }).length;
+    return dominados >= necesarios;
+  }
+
+  function rpgRender(){
+    const modal = document.getElementById('modal-content');
+    const estilos = Array.from(new Set(rpgCatalogo.map(function(p){ return p.estilo; }).filter(Boolean))).sort();
+    if(!rpgEstiloActual || !estilos.includes(rpgEstiloActual)){
+      rpgEstiloActual = rpgEstilosActivos.find(function(e){ return estilos.includes(e); }) || estilos[0] || null;
+    }
+    if(!rpgEstiloActual){
+      modal.innerHTML = '<button class="modal-close" onclick="closeModal()">&times;</button><p class="state-msg" style="color:var(--ink-soft)">No hay pasos disponibles todavía.</p>';
+      return;
+    }
+
+    const pasosEstilo = rpgCatalogo.filter(function(p){ return p.estilo === rpgEstiloActual; });
+    const dominadosTotal = pasosEstilo.filter(function(p){
+      const progreso = rpgProgreso.get(p.id);
+      return progreso && progreso.estado === 'dominado';
+    }).length;
+    const porcentaje = pasosEstilo.length ? Math.round(dominadosTotal * 100 / pasosEstilo.length) : 0;
+    const estiloActivo = rpgEstilosActivos.includes(rpgEstiloActual);
+    const sesionMensaje = !currentSession
+      ? '<div class="note-box">Inicia sesión desde Pasaportes para guardar tu progreso.</div>'
+      : (!rpgPasaporteId
+        ? '<div class="note-box">Crea tu Pasaporte para activar estilos y guardar avances.</div>'
+        : '');
+
+    const pills = estilos.map(function(estilo){
+      const clases = ['rpg-style-pill'];
+      if(estilo === rpgEstiloActual) clases.push('active');
+      if(!rpgEstilosActivos.includes(estilo)) clases.push('inactive');
+      return '<button type="button" class="' + clases.join(' ') + '" data-estilo="' + esc(estilo) + '" onclick="rpgSeleccionarEstilo(this.dataset.estilo)">' +
+        esc(estilo) + (rpgEstilosActivos.includes(estilo) ? ' ✓' : '') + '</button>';
+    }).join('');
+
+    const activar = rpgPasaporteId && !estiloActivo
+      ? '<button type="button" class="form-submit" style="width:auto;margin:0 0 18px;" data-estilo="' + esc(rpgEstiloActual) + '" onclick="rpgActivarEstilo(this.dataset.estilo)">Activar ' + esc(rpgEstiloActual) + '</button>'
+      : '';
+
+    const niveles = RPG_NIVELES.map(function(nivel){
+      const pasos = pasosEstilo.filter(function(p){ return p.dificultad === nivel; });
+      if(!pasos.length) return '';
+      const disponible = rpgNivelDisponible(rpgEstiloActual, nivel);
+      const dominados = pasos.filter(function(p){
+        const progreso = rpgProgreso.get(p.id);
+        return progreso && progreso.estado === 'dominado';
+      }).length;
+      const idx = RPG_NIVELES.indexOf(nivel);
+      let requisito = '';
+      if(!disponible && idx > 0){
+        const anterior = RPG_NIVELES[idx - 1];
+        const totalAnterior = pasosEstilo.filter(function(p){ return p.dificultad === anterior; }).length;
+        requisito = 'Domina ' + Math.min(3, totalAnterior) + ' pasos de nivel ' + anterior.toLowerCase();
+      }
+      const tarjetas = pasos.map(function(p){
+        const progreso = rpgProgreso.get(p.id);
+        const estado = !disponible ? 'bloqueado' : (progreso ? progreso.estado : 'disponible');
+        const etiqueta = estado === 'dominado' ? '⭐ Dominado' : (estado === 'practicando' ? '🟠 En práctica' : (estado === 'bloqueado' ? '🔒 Bloqueado' : '○ Disponible'));
+        let accion = '';
+        if(rpgPasaporteId && estiloActivo && disponible){
+          const siguiente = estado === 'dominado' ? 'practicando' : (estado === 'practicando' ? 'dominado' : 'practicando');
+          const texto = estado === 'dominado' ? 'Volver a practicar' : (estado === 'practicando' ? 'Marcar dominado' : 'Empezar práctica');
+          accion = '<button type="button" class="contact-btn outline" data-paso="' + esc(p.id) + '" data-estado="' + siguiente + '" onclick="rpgCambiarPaso(this.dataset.paso,this.dataset.estado)">' + texto + '</button>';
+        }
+        const video = safeHref(p.video_url);
+        return '<div class="rpg-step ' + estado + '">' +
+          '<div class="rpg-step-title">' + esc(p.nombre) + '</div>' +
+          '<div class="rpg-step-state">' + etiqueta + '</div>' +
+          (p.descripcion ? '<p class="desc" style="font-size:12px;margin:6px 0 0;">' + esc(p.descripcion) + '</p>' : '') +
+          accion +
+          (video ? '<a class="contact-btn" style="font-size:12px;padding:6px 9px;margin:8px 0 0 6px;" href="' + esc(video) + '" target="_blank" rel="noopener">Video</a>' : '') +
+          '</div>';
+      }).join('');
+      return '<section class="rpg-level' + (disponible ? '' : ' locked') + '">' +
+        '<div class="rpg-level-head"><h4>' + esc(nivel) + '</h4><span>' + dominados + '/' + pasos.length + '</span></div>' +
+        (requisito ? '<p class="rpg-note">🔒 ' + esc(requisito) + '</p>' : '') +
+        tarjetas + '</section>';
+    }).join('');
+
+    modal.innerHTML =
+      '<button class="modal-close" onclick="closeModal()">&times;</button>' +
+      '<div class="rpg-hero"><p class="kicker">PASAPORTE AURA RITMOS</p><h3 class="display">RPG del baile</h3><p>Tu árbol personal de habilidades: practicar abre camino; dominar pasos desbloquea el siguiente nivel.</p></div>' +
+      sesionMensaje +
+      '<div class="rpg-styles" aria-label="Estilos de baile">' + pills + '</div>' +
+      '<div class="rpg-summary"><div><strong>' + esc(rpgEstiloActual) + '</strong><div class="rpg-progress" aria-label="' + porcentaje + '% completado"><span style="width:' + porcentaje + '%"></span></div></div><span>' + dominadosTotal + ' de ' + pasosEstilo.length + ' dominados</span></div>' +
+      activar +
+      '<p class="rpg-note">Desbloqueo: domina hasta 3 pasos del nivel anterior. El progreso es autodeclarado y privado; no modifica tu XP.</p>' +
+      '<div class="rpg-tree">' + niveles + '</div>';
+  }
+
+  function rpgSeleccionarEstilo(estilo){
+    rpgEstiloActual = estilo;
+    rpgRender();
+  }
+
+  async function rpgActivarEstilo(estilo){
+    if(!rpgPasaporteId) return;
+    const result = await client.from('pasaporte_estilos').insert({ pasaporte_id: rpgPasaporteId, estilo: estilo });
+    if(result.error && result.error.code !== '23505'){
+      alert('No se pudo activar el estilo: ' + result.error.message);
+      return;
+    }
+    if(!rpgEstilosActivos.includes(estilo)) rpgEstilosActivos.push(estilo);
+    rpgRender();
+  }
+
+  async function rpgCambiarPaso(pasoId, estado){
+    if(!rpgPasaporteId) return;
+    const result = await client.from('pasaporte_pasos').upsert({
+      pasaporte_id: rpgPasaporteId,
+      paso_id: pasoId,
+      estado: estado,
+      origen: 'autodeclarado',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'pasaporte_id,paso_id' }).select().single();
+    if(result.error){
+      alert('No se pudo guardar el progreso: ' + result.error.message);
+      return;
+    }
+    rpgProgreso.set(pasoId, result.data);
+    rpgRender();
+  }
+
+  async function abrirRpgBaile(){
+    const modal = document.getElementById('modal-content');
+    modal.classList.add('rpg-modal');
+    modal.innerHTML = '<button class="modal-close" onclick="closeModal()">&times;</button><p class="state-msg" style="color:var(--ink-soft)">Preparando tu árbol de habilidades…</p>';
+    document.getElementById('modal-back').classList.add('open');
+    try{
+      const catalogoResult = await client.from('pasos')
+        .select('id,nombre,estilo,dificultad,descripcion,video_url')
+        .order('estilo').order('dificultad').order('nombre');
+      if(catalogoResult.error) throw new Error(catalogoResult.error.message);
+      rpgCatalogo = (catalogoResult.data || []).filter(function(p){
+        return p.estilo && RPG_NIVELES.includes(p.dificultad);
+      });
+      rpgPasaporteId = null;
+      rpgEstilosActivos = [];
+      rpgProgreso = new Map();
+
+      if(currentSession){
+        const pasaporteResult = await client.from('pasaportes')
+          .select('id').eq('auth_user_id', currentSession.user.id).maybeSingle();
+        if(pasaporteResult.error) throw new Error(pasaporteResult.error.message);
+        if(pasaporteResult.data){
+          rpgPasaporteId = pasaporteResult.data.id;
+          const resultados = await Promise.all([
+            client.from('pasaporte_estilos').select('estilo').eq('pasaporte_id', rpgPasaporteId),
+            client.from('pasaporte_pasos').select('paso_id,estado,origen,updated_at').eq('pasaporte_id', rpgPasaporteId)
+          ]);
+          if(resultados[0].error) throw new Error(resultados[0].error.message);
+          if(resultados[1].error) throw new Error(resultados[1].error.message);
+          rpgEstilosActivos = (resultados[0].data || []).map(function(x){ return x.estilo; });
+          (resultados[1].data || []).forEach(function(x){ rpgProgreso.set(x.paso_id, x); });
+        }
+      }
+      rpgRender();
+    } catch(err){
+      modal.innerHTML = '<button class="modal-close" onclick="closeModal()">&times;</button><p class="state-msg" style="color:var(--ink-soft)">No pudimos cargar el RPG: ' + esc(err.message) + '</p>';
+    }
+  }
 
   function puntosParaSiguienteDivision(elo){
     if(elo >= 2047) return null; // Maestro I, tope
