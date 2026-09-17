@@ -3005,6 +3005,13 @@
         if(!c || !c.incluye_social) ids.delete(id);
       }
     }
+    if(tipos.includes('Evento')){
+      eventosData.forEach(ev => {
+        if(ev.fecha_hora && ymd(new Date(ev.fecha_hora)) === dateStr && ev.comunidad_id){
+          ids.add(ev.comunidad_id);
+        }
+      });
+    }
     return ids;
   }
 
