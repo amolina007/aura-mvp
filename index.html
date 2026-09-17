@@ -3177,6 +3177,7 @@
         msg.className = 'form-msg ok';
         loadDocentesReclamo();
       } else {
+        if(fotosRutas.length) await client.storage.from('aportes-fotos').remove(fotosRutas);
         msg.textContent = 'No se pudo enviar: ' + error.message;
         msg.className = 'form-msg err';
       }
@@ -3834,8 +3835,9 @@
           <p class="sub" style="margin:6px 0 0;font-size:12.5px;">Sube el video a YouTube (puede ser "no listado", no hace falta que sea público), Instagram, Google Drive o Dropbox, y pega acá el enlace. No subas el archivo de video directo -- este sitio no tiene espacio para eso.</p>
         </div>
         <div class="form-field">
-          <label for="ap-fotos">Fotos (opcional, hasta 3, máx. 5 MB cada una)</label>
-          <input type="file" id="ap-fotos" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
+          <label for="ap-fotos">Fotos (opcional, hasta 3, máx. 3 MB cada una; requiere sesión)</label>
+          <input type="file" id="ap-fotos" accept="image/png,image/jpeg,image/webp" multiple${currentSession ? '' : ' disabled'}>
+          <p class="sub" style="margin:6px 0 0;font-size:12.5px;">${currentSession ? 'Las imágenes quedarán asociadas privadamente a tu cuenta.' : 'Inicia sesión para adjuntar imágenes. Puedes enviar el aporte de texto sin iniciar sesión.'}</p>
           <p class="form-msg" id="ap-fotos-msg"></p>
         </div>
         <button type="submit" class="form-submit">Enviar aporte</button>
@@ -3877,9 +3879,20 @@
         fotosMsg.textContent = 'Máximo 3 fotos.'; fotosMsg.className = 'form-msg err';
         return;
       }
+      if(archivos.length && !currentSession){
+        fotosMsg.textContent = 'Inicia sesión para adjuntar imágenes. El aporte de texto sí puede enviarse sin cuenta.';
+        fotosMsg.className = 'form-msg err';
+        return;
+      }
+      const tiposImagenPermitidos = new Set(['image/jpeg', 'image/png', 'image/webp']);
       for(const f of archivos){
-        if(f.size > 5 * 1024 * 1024){
-          fotosMsg.textContent = `"${f.name}" pesa más de 5 MB -- elige una foto más liviana.`;
+        if(!tiposImagenPermitidos.has(f.type)){
+          fotosMsg.textContent = `"${f.name}" no es JPEG, PNG ni WebP.`;
+          fotosMsg.className = 'form-msg err';
+          return;
+        }
+        if(f.size > 3 * 1024 * 1024){
+          fotosMsg.textContent = `"${f.name}" pesa más de 3 MB -- elige una foto más liviana.`;
           fotosMsg.className = 'form-msg err';
           return;
         }
@@ -3892,15 +3905,23 @@
       // avisa y no se pierde lo que la persona ya escribió (el formulario no
       // se limpia hasta que todo termine bien).
       const fotosUrls = [];
+      const fotosRutas = [];
       try{
+        const extensionPorTipo = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
         for(const f of archivos){
-          const nombre = `${Date.now()}-${Math.random().toString(36).slice(2)}-${f.name}`.replace(/[^a-zA-Z0-9._-]/g, '_');
-          const { error: errSubida } = await client.storage.from('aportes-fotos').upload(nombre, f);
+          const nombre = `${currentSession.user.id}/${crypto.randomUUID()}.${extensionPorTipo[f.type]}`;
+          const { error: errSubida } = await client.storage.from('aportes-fotos').upload(nombre, f, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: f.type,
+          });
           if(errSubida) throw new Error(`No se pudo subir "${f.name}": ${errSubida.message}`);
           const { data: pub } = client.storage.from('aportes-fotos').getPublicUrl(nombre);
+          fotosRutas.push(nombre);
           fotosUrls.push(pub.publicUrl);
         }
       } catch(errFoto){
+        if(fotosRutas.length) await client.storage.from('aportes-fotos').remove(fotosRutas);
         msg.textContent = errFoto.message;
         msg.className = 'form-msg err';
         btn.disabled = false; btn.textContent = 'Enviar aporte';
