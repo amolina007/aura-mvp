@@ -110,6 +110,13 @@
   .welcome-result-badge{display:inline-block;font-family:'Work Sans',sans-serif;font-weight:700;font-size:13px;color:#241510;background:var(--coral);border-radius:999px;padding:6px 16px;margin-bottom:14px;}
   .welcome-result-title{font-family:'Anton',sans-serif;font-size:26px;color:var(--paper);margin:0 0 10px;}
   .welcome-result-desc{color:#e9dcce;font-size:15px;line-height:1.6;margin:0 0 20px;}
+  .welcome-recommendations{display:grid;gap:12px;margin:0 0 22px;}
+  .welcome-recommendations-title{margin:0 0 2px;color:var(--amber);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+  .welcome-recommendation{background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:15px 16px;}
+  .welcome-recommendation h4{margin:0 0 6px;color:var(--paper);font-size:17px;}
+  .welcome-recommendation p{margin:3px 0;color:#e9dcce;font-size:13.5px;line-height:1.45;}
+  .welcome-recommendation-links{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;}
+  .welcome-recommendation-links button,.welcome-recommendation-links a{background:none;border:none;padding:0;color:var(--amber);font:600 13px 'Work Sans',sans-serif;text-decoration:underline;cursor:pointer;}
   .welcome-result-actions{display:flex;flex-wrap:wrap;gap:12px;}
   .welcome-result-actions button{font-family:'Work Sans',sans-serif;font-size:14px;font-weight:600;border-radius:999px;padding:11px 20px;cursor:pointer;}
   .welcome-result-primary{background:var(--coral);color:#241510;border:none;}
@@ -628,6 +635,7 @@
       <span class="welcome-result-badge" id="welcome-result-badge"></span>
       <h3 class="welcome-result-title" id="welcome-result-title"></h3>
       <p class="welcome-result-desc" id="welcome-result-desc"></p>
+      <div class="welcome-recommendations" id="welcome-result-recommendations" aria-live="polite"></div>
       <div class="welcome-result-actions" id="welcome-result-actions"></div>
       <br>
       <button class="welcome-restart" id="welcome-restart-btn">Volver a hacer el test</button>
@@ -1485,7 +1493,63 @@
     });
   }
 
-  function welcomeShowResult(){
+  function welcomeCommunityScore(comunidad, perfil){
+    let score = 0;
+    const nombre = (comunidad.nombre || '').toLowerCase();
+    const horario = (comunidad.horario || '').toLowerCase();
+    if(comunidad.incluye_social) score += ['social','aventura','bienestar'].includes(perfil) ? 5 : 2;
+    if(nombre.includes('rumba') || nombre.includes('unión') || nombre.includes('union')) score += 3;
+    if(perfil === 'tranquilo' && (horario.includes('inicial') || horario.includes('gratis'))) score += 4;
+    if(perfil === 'vital' && comunidad.incluye_social) score += 2;
+    if(comunidad.locacion_nombre) score += 1;
+    return score;
+  }
+
+  async function welcomeLoadRecommendations(perfilClave){
+    const box = document.getElementById('welcome-result-recommendations');
+    box.innerHTML = '<p class="state-msg" style="padding:12px 0;">Buscando horarios y lugares vigentes…</p>';
+    try{
+      const { data, error } = await client.from('comunidades_publicas')
+        .select('id, nombre, horario, estilos, incluye_social, precio_clase, precio_combo, locacion_nombre, locacion_mapa_url, locacion_comuna')
+        .order('nombre');
+      if(error) throw new Error(error.message);
+      const recomendaciones = (data || [])
+        .filter(c => c.horario && c.locacion_nombre)
+        .sort((a,b) => welcomeCommunityScore(b, perfilClave) - welcomeCommunityScore(a, perfilClave)
+          || a.nombre.localeCompare(b.nombre, 'es'))
+        .slice(0, 3);
+      if(!recomendaciones.length){
+        box.innerHTML = '<p class="state-msg" style="padding:12px 0;">Aún no hay horarios y lugares confirmados para recomendarte.</p>';
+        return;
+      }
+      box.innerHTML = '<p class="welcome-recommendations-title">Opciones reales para empezar</p>' + recomendaciones.map(c => {
+        const estilos = Array.isArray(c.estilos) ? c.estilos.join(' · ') : (c.estilos || '');
+        const mapaUrl = safeHref(c.locacion_mapa_url);
+        return `
+          <article class="welcome-recommendation">
+            <h4>${esc(c.nombre)}</h4>
+            <p>🕒 ${esc(c.horario)}</p>
+            <p>📍 ${esc([c.locacion_nombre, c.locacion_comuna].filter(Boolean).join(' · '))}</p>
+            ${estilos ? `<p>🎵 ${esc(estilos)}</p>` : ''}
+            <div class="welcome-recommendation-links">
+              <button type="button" data-welcome-community="${esc(c.id)}">Ver ficha de la agrupación</button>
+              ${mapaUrl ? `<a href="${mapaUrl}" target="_blank" rel="noopener">Abrir mapa</a>` : ''}
+            </div>
+          </article>`;
+      }).join('');
+      box.querySelectorAll('[data-welcome-community]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelector('.tab[data-view="agrupaciones"]').click();
+          const id = btn.dataset.welcomeCommunity;
+          window.setTimeout(() => openModal(id), 80);
+        });
+      });
+    } catch(err){
+      box.innerHTML = `<p class="state-msg" style="padding:12px 0;">No pudimos consultar horarios y lugares ahora: ${esc(err.message)}</p>`;
+    }
+  }
+
+  async function welcomeShowResult(){
     const orden = ['bienestar','social','tranquilo','aventura','vital'];
     let mejor = orden[0];
     orden.forEach(k => { if(welcomeScores[k] > welcomeScores[mejor]) mejor = k; });
@@ -1496,25 +1560,26 @@
     document.getElementById('welcome-result-badge').textContent = perfil.badge;
     document.getElementById('welcome-result-title').textContent = `${perfil.emoji} ${perfil.nombre}`;
     document.getElementById('welcome-result-desc').textContent = perfil.desc
-      + ' Si quieres, puedes crear tu Pasaporte y empezar tu propio recorrido en AuraRitmos — todo el mundo parte igual, como Visitante.';
+      + ' Estas recomendaciones usan los horarios y lugares publicados actualmente por las agrupaciones.';
 
     const actions = document.getElementById('welcome-result-actions');
     actions.innerHTML = '';
+    const btnEventos = document.createElement('button');
+    btnEventos.className = 'welcome-result-primary';
+    btnEventos.textContent = 'Ver próximos eventos';
+    btnEventos.addEventListener('click', () => {
+      document.querySelector('.tab[data-view="eventos"]').click();
+    });
     const btnAgrupaciones = document.createElement('button');
-    btnAgrupaciones.className = 'welcome-result-primary';
-    btnAgrupaciones.textContent = 'Ver agrupaciones para empezar';
+    btnAgrupaciones.className = 'welcome-result-secondary';
+    btnAgrupaciones.textContent = 'Ver todas las agrupaciones';
     btnAgrupaciones.addEventListener('click', () => {
       document.querySelector('.tab[data-view="agrupaciones"]').click();
     });
-    const btnPasaporte = document.createElement('button');
-    btnPasaporte.className = 'welcome-result-secondary';
-    btnPasaporte.textContent = 'Crear mi Pasaporte';
-    btnPasaporte.addEventListener('click', () => {
-      document.querySelector('.tab[data-view="pasaportes"]').click();
-    });
+    actions.appendChild(btnEventos);
     actions.appendChild(btnAgrupaciones);
-    actions.appendChild(btnPasaporte);
 
+    await welcomeLoadRecommendations(mejor);
     localStorage.setItem('aura_welcome_seen', '1');
   }
 
@@ -2253,7 +2318,7 @@
     const fechaLabel = fecha
       ? fecha.toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit'})
       : 'Por confirmar';
-    const loc = locacionesData.find(l => l.id === ev.locacion_id);
+    const loc = ev.locaciones || locacionesData.find(l => l.id === ev.locacion_id);
     const difusionUrl = safeHref(ev.url_difusion);
     const yaOcurrio = fecha && fecha.getTime() <= Date.now();
     return `
@@ -2332,7 +2397,7 @@
   async function loadEventos(){
     const grid = document.getElementById('eventos-grid');
     try{
-      const { data, error } = await client.from('eventos').select('*').order('fecha_hora');
+      const { data, error } = await client.from('eventos').select('*, locaciones(nombre, mapa_url, comuna)').order('fecha_hora');
       if(error) throw new Error(error.message);
       eventosDataFull = data || [];
       if(!eventosDataFull.length){
