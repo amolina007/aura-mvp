@@ -2935,13 +2935,15 @@
   function weekdayName(dateObj){ return DIAS_SEMANA[dateObj.getDay()]; }
 
   // Las clases "Regular" no tienen fecha de término: se repiten cada semana el mismo
-  // día indefinidamente. Tomamos, por comunidad + día de la semana, el registro más
-  // reciente como plantilla para proyectar la ocurrencia hacia cualquier fecha futura.
+  // día indefinidamente. Tomamos el registro más reciente de cada clase de una comunidad
+  // para permitir, por ejemplo, Salsa y Bachata consecutivas el mismo día.
   function recurringTemplates(){
     const map = {};
     clasesData.forEach(c => {
       if(c.tipo !== 'Regular' || c.estado === 'Cancelado' || !c.dia_semana) return;
-      const key = c.dia_semana + '|' + (c.comunidad_id || c.nombre);
+      const clase = [c.nombre, c.estilo, (c.estilos_impartidos || []).join(',')]
+        .filter(Boolean).join('|').toLowerCase();
+      const key = c.dia_semana + '|' + (c.comunidad_id || '') + '|' + clase;
       if(!map[key] || (c.fecha || '') > (map[key].fecha || '')) map[key] = c;
     });
     return Object.values(map);
