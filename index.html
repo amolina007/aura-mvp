@@ -302,6 +302,27 @@
   }
   .modal-section p{margin:0;font-size:15px;}
   .modal-contact a{color:var(--coral);font-weight:600;text-decoration:none;border-bottom:1.5px solid var(--coral);}
+  .representative-card{
+    padding:14px 16px;border:1px solid rgba(36,21,16,.18);
+    background:rgba(224,90,58,.07);
+  }
+  .representative-card details{margin:0;}
+  .representative-card summary{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    cursor:pointer;font-weight:700;color:var(--ink);list-style:none;
+  }
+  .representative-card summary::-webkit-details-marker{display:none;}
+  .representative-card summary span{font-size:12px;color:var(--coral);font-weight:700;}
+  .representative-card details[open] summary span::after{content:' Ocultar';font-size:0;}
+  .representative-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .representative-links a{
+    display:inline-flex;align-items:center;padding:7px 11px;border-radius:999px;
+    color:var(--paper);background:var(--ink);font-size:13px;font-weight:700;
+    text-decoration:none;border:1px solid var(--ink);
+  }
+  .representative-links a:hover,.representative-links a:focus-visible{
+    background:var(--coral);border-color:var(--coral);color:#fff;
+  }
 
   .state-msg{
     color:#e9dcce;font-size:15px;padding:40px 0;text-align:center;
@@ -1871,6 +1892,23 @@
         <div id="modal-social-editor"></div>
       </div>`;
 
+    const representativeLinks = [];
+    const representativeWhatsApp = safeHref(c.representante_whatsapp);
+    const representativeEmail = safeHref(c.representante_email ? 'mailto:' + c.representante_email : null);
+    const representativeInstagram = safeHref(c.representante_instagram);
+    if(representativeWhatsApp) representativeLinks.push(`<a href="${representativeWhatsApp}" target="_blank" rel="noopener">WhatsApp</a>`);
+    if(representativeEmail) representativeLinks.push(`<a href="${representativeEmail}">Correo</a>`);
+    if(representativeInstagram) representativeLinks.push(`<a href="${representativeInstagram}" target="_blank" rel="noopener">Instagram</a>`);
+    const representativeSection = c.representante_nombre
+      ? `<div class="modal-section representative-card">
+          <h4>Representante</h4>
+          <details>
+            <summary>${esc(c.representante_nombre)} <span>Ver contacto</span></summary>
+            <div class="representative-links">${representativeLinks.join('')}</div>
+          </details>
+        </div>`
+      : '';
+
     return `
       <button class="modal-close" onclick="closeModal()">&times;</button>
       ${photoBlock(c)}
@@ -1887,6 +1925,7 @@
       ${optionalSection('Visión', c.vision)}
       ${optionalSection('Misión', c.mision)}
       ${optionalSection('Público objetivo', c.publico_objetivo)}
+      ${representativeSection}
       ${socialSection}
       <div class="modal-section" id="modal-docentes-box">
         <h4>Docentes</h4>
