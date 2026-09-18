@@ -436,25 +436,30 @@
   }
 
   /* ---- calendar ---- */
-  .cal-layout{display:grid;grid-template-columns:1.3fr 1fr;gap:32px;align-items:start;}
+  .group-week-board{margin:6px 0 32px;padding:22px;background:rgba(246,239,228,.06);border:1px solid rgba(246,239,228,.18);}
+  .group-week-heading{display:flex;justify-content:space-between;align-items:end;gap:18px;margin-bottom:16px;}
+  .group-week-heading h3{margin:0;color:var(--paper);font-size:25px;}
+  .group-week-heading p{margin:4px 0 0;color:#c9b8a8;font-size:13px;}
+  .cal-layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(250px,.8fr);gap:22px;align-items:start;}
   .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
   .cal-nav button{
     background:rgba(246,239,228,0.1);border:1px solid rgba(246,239,228,0.3);color:var(--paper);
     width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:16px;
   }
   #cal-month-label{font-size:22px;color:var(--paper);text-transform:capitalize;}
-  .cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;
-    font-size:12px;color:#c9b8a8;margin-bottom:6px;}
-  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+  .cal-weekdays{display:none;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(86px,1fr));gap:7px;}
   .cal-day{
-    aspect-ratio:1;background:rgba(246,239,228,0.06);border:1px solid rgba(246,239,228,0.14);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    font-size:13px;color:#e9dcce;cursor:pointer;position:relative;
+    min-height:102px;background:rgba(246,239,228,0.06);border:1px solid rgba(246,239,228,0.14);
+    display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;
+    padding:11px 9px;font-size:13px;color:#e9dcce;cursor:pointer;position:relative;
   }
   .cal-day.empty{background:none;border:none;cursor:default;}
   .cal-day.today{border-color:var(--amber);}
   .cal-day.selected{background:var(--coral);color:#fff;border-color:var(--coral);}
-  .cal-day .dot{width:5px;height:5px;border-radius:50%;background:var(--amber);margin-top:3px;}
+  .cal-day .weekday{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
+  .cal-day .day-number{font-family:'Anton',sans-serif;font-size:27px;line-height:1;}
+  .cal-day .activity-count{font-size:10.5px;font-weight:700;color:var(--amber);}
   .cal-day.selected .dot{background:#fff;}
 
   .cal-agenda{background:var(--paper);color:var(--ink);padding:22px;min-height:200px;}
@@ -474,6 +479,9 @@
 
   @media (max-width:760px){
     .cal-layout{grid-template-columns:1fr;}
+    .group-week-board{padding:16px 12px;}
+    .cal-grid-wrap{overflow-x:auto;padding-bottom:8px;}
+    .cal-grid{min-width:700px;}
   }
 
   footer{
@@ -698,9 +706,8 @@
 <nav class="tabs">
   <div class="wrap tabs-inner">
     <button class="tab" data-view="empezar">🌟 Empezar aquí</button>
-    <button class="tab active" data-view="agrupaciones">💃 Agrupaciones</button>
+    <button class="tab active" data-view="agrupaciones">💃 Agrupaciones y semana</button>
     <button class="tab" data-view="repertorio">🩰 Repertorio</button>
-    <button class="tab" data-view="calendario">📅 Calendario</button>
     <button class="tab" data-view="eventos">🎉 Eventos</button>
     <button class="tab" data-view="locaciones">📍 Locaciones</button>
     <button class="tab" data-view="ecosistema">🤝 Ecosistema</button>
@@ -772,8 +779,8 @@
 
 <section class="wall" id="view-agrupaciones" style="display:none">
   <div class="wrap">
-    <h2 class="display">Quién está bailando esta semana</h2>
-    <p class="sub">Datos en vivo desde la base de Convergencia Aura.</p>
+    <h2 class="display">Agrupaciones y agenda semanal</h2>
+    <p class="sub">Descubre quién está bailando, dónde se reúne y qué ocurre durante la semana.</p>
 
     <div class="filters">
       <div class="filter-group">
@@ -799,6 +806,31 @@
       </div>
       <button class="clear" id="f-clear">Limpiar filtros</button>
     </div>
+
+    <div class="group-week-board">
+      <div class="group-week-heading">
+        <div>
+          <h3 class="display">Esta semana</h3>
+          <p>Los filtros también actualizan las clases de las agrupaciones.</p>
+        </div>
+      </div>
+      <div class="cal-layout">
+        <div class="cal-grid-wrap">
+          <div class="cal-nav">
+            <button id="cal-prev" aria-label="Semana anterior">←</button>
+            <span id="cal-month-label" class="display"></span>
+            <button id="cal-next" aria-label="Semana siguiente">→</button>
+          </div>
+          <div id="cal-grid" class="cal-grid"></div>
+        </div>
+        <div class="cal-agenda">
+          <h3 id="agenda-title" class="display">Hoy</h3>
+          <div id="agenda-list"><p class="state-msg">Cargando semana…</p></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="display" style="font-size:28px;margin:0 0 18px;">Agrupaciones</h3>
 
     <div id="grid" class="grid">
       <p class="state-msg">Cargando agrupaciones…</p>
@@ -846,31 +878,6 @@
     <div class="aportar-footer">
       <p>¿Falta un paso, figura o secuencia?</p>
       <button onclick="irAAportar('paso_figura')">➕ Agregar o corregir</button>
-    </div>
-  </div>
-</section>
-
-<section class="wall" id="view-calendario" style="display:none">
-  <div class="wrap">
-    <h2 class="display">Calendario</h2>
-    <p class="sub">Clases, sociales y eventos — todo en un mismo lugar.</p>
-
-    <div class="cal-layout">
-      <div class="cal-grid-wrap">
-        <div class="cal-nav">
-          <button id="cal-prev" aria-label="Mes anterior">←</button>
-          <span id="cal-month-label" class="display"></span>
-          <button id="cal-next" aria-label="Mes siguiente">→</button>
-        </div>
-        <div class="cal-weekdays">
-          <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
-        </div>
-        <div id="cal-grid" class="cal-grid"></div>
-      </div>
-      <div class="cal-agenda">
-        <h3 id="agenda-title" class="display">Hoy</h3>
-        <div id="agenda-list"></div>
-      </div>
     </div>
   </div>
 </section>
@@ -1399,7 +1406,7 @@
 
       <details class="faq-item">
         <summary>¿Cómo se publica un evento en AuraRitmos?</summary>
-        <p>Un organizador o una agrupación informa fecha, lugar y tipo de evento, y se agrega a la sección Eventos y al calendario.</p>
+        <p>Un organizador o una agrupación informa fecha, lugar y tipo de evento, y se agrega a la sección Eventos y a la agenda semanal.</p>
       </details>
 
       <details class="faq-item">
@@ -2096,6 +2103,7 @@
       populateFilters(data);
       renderGrid(applyFiltersAndSort(data));
       autoFiltrarPorComunaCercana(data);
+      if(!calendarioLoaded) await loadCalendario();
     } catch(e){
       console.error('Unexpected error:', e);
       grid.innerHTML = `<p class="state-msg">Error inesperado: ${esc(e.message)}</p>`;
@@ -2104,6 +2112,13 @@
 
   function renderGrid(list){
     const grid = document.getElementById('grid');
+    const filtrosActivos = ['f-loc','f-comuna','f-estilo'].some(id => document.getElementById(id).value);
+    calCommunityFilter = filtrosActivos ? new Set(list.map(c => c.id)) : null;
+    if(calendarioLoaded){
+      renderCalGrid();
+      const lbl = calSelected.toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long'});
+      renderAgenda(ymd(calSelected), lbl.charAt(0).toUpperCase() + lbl.slice(1));
+    }
     if(!list.length){
       grid.innerHTML = `<p class="state-msg">Ninguna agrupación calza con ese filtro.</p>`;
       return;
@@ -2225,12 +2240,12 @@
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      ['empezar','agrupaciones','repertorio','calendario','eventos','locaciones','ecosistema','docentes','pasaportes','gestor-clases','historias','bienestar','registro','aportes','faq'].forEach(v => {
+      ['empezar','agrupaciones','repertorio','eventos','locaciones','ecosistema','docentes','pasaportes','gestor-clases','historias','bienestar','registro','aportes','faq'].forEach(v => {
         document.getElementById('view-' + v).style.display = (v === btn.dataset.view) ? '' : 'none';
       });
       if(btn.dataset.view === 'empezar' && !welcomeStoriesLoaded) loadWelcomeStories();
       if(btn.dataset.view === 'repertorio' && !repertorioLoaded) loadRepertorio();
-      if(btn.dataset.view === 'calendario' && !calendarioLoaded) loadCalendario();
+      if(btn.dataset.view === 'agrupaciones' && !calendarioLoaded) loadCalendario();
       if(btn.dataset.view === 'locaciones' && !locacionesLoaded) loadLocaciones();
       if(btn.dataset.view === 'eventos' && !eventosLoaded) loadEventos();
       if(btn.dataset.view === 'ecosistema' && !ecosistemaLoaded) loadEcosistema();
@@ -2252,7 +2267,7 @@
     document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
     const btnInicial = document.querySelector(`.tab[data-view="${vista}"]`);
     btnInicial.classList.add('active');
-    ['empezar','agrupaciones','repertorio','calendario','eventos','locaciones','ecosistema','docentes','pasaportes','gestor-clases','historias','bienestar','registro','aportes','faq'].forEach(v => {
+    ['empezar','agrupaciones','repertorio','eventos','locaciones','ecosistema','docentes','pasaportes','gestor-clases','historias','bienestar','registro','aportes','faq'].forEach(v => {
       document.getElementById('view-' + v).style.display = (v === vista) ? '' : 'none';
     });
     // setTimeout(...,0): loadWelcomeStories() usa variables declaradas más
@@ -2514,7 +2529,7 @@
             <button type="button" data-event-detail="${esc(ev.id)}">Ver detalles, likes y comentarios</button>
             ${comunidad ? `<button type="button" class="secondary" data-event-community="${esc(comunidad.id)}">Ver agrupación</button>` : ''}
             ${mapaUrl ? `<a href="${mapaUrl}" target="_blank" rel="noopener">Abrir lugar</a>` : ''}
-            ${fecha ? `<button type="button" class="secondary" data-event-calendar="${esc(ev.id)}">Ver en calendario</button>` : ''}
+            ${fecha ? `<button type="button" class="secondary" data-event-calendar="${esc(ev.id)}">Ver en la semana</button>` : ''}
           </div>
         </div>
       </article>`;
@@ -2539,7 +2554,7 @@
       <div class="event-actions" style="margin-top:18px;">
         ${comunidad ? `<button type="button" data-modal-community="${esc(comunidad.id)}">Ver agrupación</button>` : ''}
         ${mapaUrl ? `<a href="${mapaUrl}" target="_blank" rel="noopener">Abrir lugar</a>` : ''}
-        ${fecha ? '<button type="button" class="secondary" id="event-modal-calendar">Ver en calendario</button>' : ''}
+        ${fecha ? '<button type="button" class="secondary" id="event-modal-calendar">Ver en la semana</button>' : ''}
       </div>
       ${ev.descripcion ? `<div class="modal-section"><h4>Sobre el evento</h4><p>${esc(ev.descripcion)}</p></div>` : ''}
       ${difusionUrl ? `<div class="modal-section modal-contact"><h4>Más información</h4><p><a href="${difusionUrl}" target="_blank" rel="noopener">Ver difusión</a></p></div>` : ''}
@@ -2551,9 +2566,9 @@
     if(!ev || !ev.fecha_hora) return;
     const fecha = new Date(ev.fecha_hora);
     calSelected = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
-    calMonth = new Date(fecha.getFullYear(), fecha.getMonth(), 1);
+    calMonth = startOfWeek(calSelected);
     closeModal();
-    document.querySelector('.tab[data-view="calendario"]').click();
+    document.querySelector('.tab[data-view="agrupaciones"]').click();
     if(!calendarioLoaded) await loadCalendario();
     renderCalGrid();
     const label = calSelected.toLocaleDateString('es-CL', {weekday:'long',day:'numeric',month:'long'});
@@ -2967,17 +2982,23 @@
   // ---------------- Calendario ----------------
   let calendarioLoaded = false;
   let clasesData = [], eventosData = [];
-  let calMonth = hoyComoDate();
-  calMonth.setDate(1);
+  let calCommunityFilter = null;
+  let calMonth = startOfWeek(hoyComoDate());
   let calSelected = hoyComoDate();
 
   document.getElementById('cal-prev').addEventListener('click', () => {
-    calMonth.setMonth(calMonth.getMonth() - 1);
+    calMonth.setDate(calMonth.getDate() - 7);
+    calSelected = new Date(calMonth);
     renderCalGrid();
+    const lbl = calSelected.toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long'});
+    renderAgenda(ymd(calSelected), lbl.charAt(0).toUpperCase() + lbl.slice(1));
   });
   document.getElementById('cal-next').addEventListener('click', () => {
-    calMonth.setMonth(calMonth.getMonth() + 1);
+    calMonth.setDate(calMonth.getDate() + 7);
+    calSelected = new Date(calMonth);
     renderCalGrid();
+    const lbl = calSelected.toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long'});
+    renderAgenda(ymd(calSelected), lbl.charAt(0).toUpperCase() + lbl.slice(1));
   });
 
   // (v3.4) Antes usaba d.toISOString(), que convierte a UTC -- entre ~20:00
@@ -3013,6 +3034,13 @@
     }
   }
   function hoyComoDate(){ return new Date(fechaHoyEnZona() + 'T00:00:00'); }
+  function startOfWeek(dateObj){
+    const d = new Date(dateObj);
+    const offset = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - offset);
+    d.setHours(0,0,0,0);
+    return d;
+  }
 
   const DIAS_SEMANA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   function weekdayName(dateObj){ return DIAS_SEMANA[dateObj.getDay()]; }
@@ -3036,6 +3064,7 @@
     const comunidadesConFechaEspecifica = new Set();
 
     clasesData.forEach(c => {
+      if(calCommunityFilter && (!c.comunidad_id || !calCommunityFilter.has(c.comunidad_id))) return;
       if(c.fecha === dateStr){
         if(c.comunidad_id) comunidadesConFechaEspecifica.add(c.comunidad_id);
         items.push({
@@ -3050,6 +3079,7 @@
     // Ocurrencias recurrentes de clases regulares (sin fecha de término), evitando
     // duplicar una fecha que ya tiene un registro específico (ej. una cancelación).
     recurringTemplates().forEach(t => {
+      if(calCommunityFilter && (!t.comunidad_id || !calCommunityFilter.has(t.comunidad_id))) return;
       if(t.dia_semana !== diaSemana) return;
       if(t.comunidad_id && comunidadesConFechaEspecifica.has(t.comunidad_id)) return;
       items.push({
@@ -3093,31 +3123,29 @@
   }
 
   function renderCalGrid(){
-    const label = calMonth.toLocaleDateString('es-CL', {month:'long', year:'numeric'});
-    document.getElementById('cal-month-label').textContent = label;
+    const weekStart = startOfWeek(calMonth);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const startLabel = weekStart.toLocaleDateString('es-CL', {day:'numeric', month:'short'});
+    const endLabel = weekEnd.toLocaleDateString('es-CL', {day:'numeric', month:'short', year:'numeric'});
+    document.getElementById('cal-month-label').textContent = `${startLabel} — ${endLabel}`;
 
-    const year = calMonth.getFullYear(), month = calMonth.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const startOffset = (firstDay.getDay() + 6) % 7; // Monday-first
-    const daysInMonth = new Date(year, month+1, 0).getDate();
     const todayStr = fechaHoyEnZona();
     const selectedStr = ymd(calSelected);
-
-    const activeDates = new Set([...clasesData.map(c=>c.fecha).filter(Boolean),
-      ...eventosData.map(e=>e.fecha_hora ? e.fecha_hora.slice(0,10) : null).filter(Boolean)]);
-    const templates = recurringTemplates();
-
     let html = '';
-    for(let i=0;i<startOffset;i++) html += `<div class="cal-day empty"></div>`;
-    for(let d=1; d<=daysInMonth; d++){
-      const dateObj = new Date(year, month, d);
+    for(let i=0; i<7; i++){
+      const dateObj = new Date(weekStart);
+      dateObj.setDate(weekStart.getDate() + i);
       const dateStr = ymd(dateObj);
       const cls = ['cal-day'];
       if(dateStr === todayStr) cls.push('today');
       if(dateStr === selectedStr) cls.push('selected');
-      const esRecurrente = templates.some(t => t.dia_semana === weekdayName(dateObj));
-      const dot = (activeDates.has(dateStr) || esRecurrente) ? '<span class="dot"></span>' : '';
-      html += `<div class="${cls.join(' ')}" data-date="${dateStr}">${d}${dot}</div>`;
+      const activityCount = itemsForDate(dateStr).length;
+      html += `<div class="${cls.join(' ')}" data-date="${dateStr}">
+        <span class="weekday">${esc(weekdayName(dateObj).slice(0,3))}</span>
+        <span class="day-number">${dateObj.getDate()}</span>
+        <span class="activity-count">${activityCount ? activityCount + (activityCount === 1 ? ' actividad' : ' actividades') : 'Sin actividad'}</span>
+      </div>`;
     }
     document.getElementById('cal-grid').innerHTML = html;
 
